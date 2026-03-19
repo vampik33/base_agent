@@ -87,7 +87,11 @@ export class SelfEvolver {
     // Create/reset evolve branch from configured base branch
     try {
       this.checkoutBranch(cwd, baseBranch);
-      execSync(`git branch -D ${branch}`, { cwd, stdio: "ignore" });
+      try {
+        execSync(`git branch -D ${branch}`, { cwd, stdio: "ignore" });
+      } catch {
+        // Branch may not exist yet — that's fine
+      }
       execSync(`git checkout -B ${branch}`, { cwd, stdio: "pipe" });
     } catch (err) {
       try {
