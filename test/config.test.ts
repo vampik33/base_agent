@@ -10,6 +10,7 @@ const CONFIG_ENV_VARS = [
   "SELF_EVOLVE_ENABLED",
   "DEFAULT_BRANCH",
   "SELF_EVOLVE_BRANCH",
+  "LOG_LEVEL",
   "DEFAULT_SYSTEM_PROMPT",
 ] as const;
 
@@ -83,5 +84,26 @@ describe("loadConfig", () => {
     process.env.DEFAULT_BRANCH = "trunk";
     const config = loadConfig();
     expect(config.defaultBranch).toBe("trunk");
+  });
+
+  it("defaults logLevel to normal", () => {
+    process.env.API_KEY = "sk-test";
+    const config = loadConfig();
+    expect(config.logLevel).toBe("normal");
+  });
+
+  it("accepts valid LOG_LEVEL values", () => {
+    process.env.API_KEY = "sk-test";
+    for (const level of ["quiet", "normal", "verbose"] as const) {
+      process.env.LOG_LEVEL = level;
+      const config = loadConfig();
+      expect(config.logLevel).toBe(level);
+    }
+  });
+
+  it("rejects invalid LOG_LEVEL", () => {
+    process.env.API_KEY = "sk-test";
+    process.env.LOG_LEVEL = "debug";
+    expect(() => loadConfig()).toThrow();
   });
 });

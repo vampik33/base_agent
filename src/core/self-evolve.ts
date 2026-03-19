@@ -1,4 +1,4 @@
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { query } from "@anthropic-ai/claude-agent-sdk";
 import type Database from "better-sqlite3";
 import type { Config } from "../config.js";
@@ -68,7 +68,7 @@ export class SelfEvolver {
 
     // Ensure clean working tree
     try {
-      const status = execSync("git status --porcelain", { cwd, encoding: "utf-8" }).trim();
+      const status = execFileSync("git", ["status", "--porcelain"], { cwd, encoding: "utf-8" }).trim();
       if (status) {
         console.log("[self-evolve] Working tree is not clean. Aborting.");
         return false;
@@ -89,11 +89,11 @@ export class SelfEvolver {
     try {
       this.checkoutBranch(cwd, baseBranch);
       try {
-        execSync(`git branch -D ${branch}`, { cwd, stdio: "ignore" });
+        execFileSync("git", ["branch", "-D", branch], { cwd, stdio: "ignore" });
       } catch {
         // Branch may not exist yet — that's fine
       }
-      execSync(`git checkout -B ${branch}`, { cwd, stdio: "pipe" });
+      execFileSync("git", ["checkout", "-B", branch], { cwd, stdio: "pipe" });
     } catch (err) {
       try {
         this.checkoutBranch(cwd, originalBranch);
@@ -125,14 +125,14 @@ export class SelfEvolver {
 
     try {
       // All gates passed -- commit and merge
-      execSync("git add -A", { cwd });
-      diff = execSync("git diff --cached", { cwd, encoding: "utf-8" }).trim();
-      execSync(`git commit -m "self-evolve: ${description.slice(0, 72)}"`, { cwd, stdio: "pipe" });
-      commitHash = execSync("git rev-parse HEAD", { cwd, encoding: "utf-8" }).trim();
+      execFileSync("git", ["add", "-A"], { cwd });
+      diff = execFileSync("git", ["diff", "--cached"], { cwd, encoding: "utf-8" }).trim();
+      execFileSync("git", ["commit", "-m", `self-evolve: ${description.slice(0, 72)}`], { cwd, stdio: "pipe" });
+      commitHash = execFileSync("git", ["rev-parse", "HEAD"], { cwd, encoding: "utf-8" }).trim();
 
       this.checkoutBranch(cwd, baseBranch);
-      execSync(`git merge --ff-only ${branch}`, { cwd, stdio: "pipe" });
-      execSync(`git branch -d ${branch}`, { cwd, stdio: "pipe" });
+      execFileSync("git", ["merge", "--ff-only", branch], { cwd, stdio: "pipe" });
+      execFileSync("git", ["branch", "-d", branch], { cwd, stdio: "pipe" });
     } catch (err) {
       const errorMessage = `Git finalize failed:\n${extractStderr(err).slice(0, 2000)}`;
       console.error("[self-evolve]", errorMessage);
@@ -161,7 +161,7 @@ export class SelfEvolver {
         model: profile.model,
         env: buildModelEnv(profile),
         systemPrompt,
-        allowedTools: SELF_EVOLVE_TOOLS,
+        tools: SELF_EVOLVE_TOOLS,
         maxTurns: 30,
         permissionMode: "bypassPermissions",
         allowDangerouslySkipPermissions: true,
@@ -171,8 +171,8 @@ export class SelfEvolver {
       logMessage("self-evolve", message);
     }
 
-    const diff = execSync("git diff", { cwd, encoding: "utf-8" }).trim();
-    const untrackedOutput = execSync("git ls-files --others --exclude-standard", { cwd, encoding: "utf-8" }).trim();
+    const diff = execFileSync("git", ["diff"], { cwd, encoding: "utf-8" }).trim();
+    const untrackedOutput = execFileSync("git", ["ls-files", "--others", "--exclude-standard"], { cwd, encoding: "utf-8" }).trim();
 
     if (!diff && !untrackedOutput) {
       console.log("[self-evolve] No changes made. Aborting.");
@@ -180,7 +180,7 @@ export class SelfEvolver {
     }
 
     const changedFiles = splitNonEmpty(
-      execSync("git diff --name-only", { cwd, encoding: "utf-8" })
+      execFileSync("git", ["diff", "--name-only"], { cwd, encoding: "utf-8" })
     );
     const untrackedFiles = splitNonEmpty(untrackedOutput);
     const allChanged = [...changedFiles, ...untrackedFiles];
@@ -198,17 +198,17 @@ export class SelfEvolver {
     }
 
     // Gate 1: Typecheck
-    this.runGate(cwd, "npx tsc --noEmit", "Typecheck");
+    this.runGate(cwd, "npx", ["tsc", "--noEmit"], "Typecheck");
 
     // Gate 2: Tests
-    this.runGate(cwd, "npm test", "Tests");
+    this.runGate(cwd, "npm", ["test"], "Tests");
 
     return diff;
   }
 
-  private runGate(cwd: string, command: string, label: string): void {
+  private runGate(cwd: string, cmd: string, args: string[], label: string): void {
     try {
-      execSync(command, { cwd, encoding: "utf-8", stdio: "pipe" });
+      execFileSync(cmd, args, { cwd, encoding: "utf-8", stdio: "pipe" });
       console.log(`[self-evolve] ${label} passed.`);
     } catch (err) {
       console.log(`[self-evolve] ${label} failed. Aborting.`);
@@ -221,7 +221,7 @@ export class SelfEvolver {
   private abortEvolution(cwd: string, baseBranch: string, originalBranch: string, branch: string): void {
     try {
       this.checkoutBranch(cwd, baseBranch);
-      execSync(`git branch -D ${branch}`, { cwd, stdio: "ignore" });
+      execFileSync("git", ["branch", "-D", branch], { cwd, stdio: "ignore" });
       if (originalBranch && originalBranch !== baseBranch) {
         this.checkoutBranch(cwd, originalBranch);
       }
@@ -231,11 +231,11 @@ export class SelfEvolver {
   }
 
   private getCurrentBranch(cwd: string): string {
-    return execSync("git rev-parse --abbrev-ref HEAD", { cwd, encoding: "utf-8" }).trim();
+    return execFileSync("git", ["rev-parse", "--abbrev-ref", "HEAD"], { cwd, encoding: "utf-8" }).trim();
   }
 
   private checkoutBranch(cwd: string, branch: string): void {
-    execSync(`git checkout ${branch}`, { cwd, stdio: "pipe" });
+    execFileSync("git", ["checkout", branch], { cwd, stdio: "pipe" });
   }
 
   private logAttempt(

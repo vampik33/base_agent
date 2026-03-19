@@ -59,7 +59,7 @@ export interface SkillDefinition {
   name: string;
   description: string;
   systemPrompt: string;
-  tools: string[];
+  tools: string[] | null;
   model: string | null;
   mcpServers: Record<string, unknown>;
 }

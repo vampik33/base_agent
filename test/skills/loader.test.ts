@@ -120,4 +120,49 @@ Test.
     expect(skills.has("skill a")).toBe(true);
     expect(skills.has("skill b")).toBe(true);
   });
+
+  it("treats missing Tools section as unspecified", () => {
+    const content = `# No Tools
+
+## Description
+
+Skill without tools section.
+
+## System Prompt
+
+Do things.
+`;
+    writeFileSync(join(testDir, "no-tools.md"), content);
+
+    const skills = loadSkills(testDir);
+    const skill = skills.get("no tools");
+
+    expect(skill).toBeDefined();
+    expect(skill!.tools).toBeNull();
+  });
+
+  it("treats blank Tools section as unspecified", () => {
+    const content = `# Blank Tools
+
+## Description
+
+Skill with blank tools section.
+
+## System Prompt
+
+Do things.
+
+## Tools
+
+
+## Model
+`;
+    writeFileSync(join(testDir, "blank-tools.md"), content);
+
+    const skills = loadSkills(testDir);
+    const skill = skills.get("blank tools");
+
+    expect(skill).toBeDefined();
+    expect(skill!.tools).toBeNull();
+  });
 });

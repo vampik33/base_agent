@@ -45,7 +45,7 @@ export async function executeTask(
         model: modelProfile.model,
         env: buildModelEnv(modelProfile),
         systemPrompt,
-        allowedTools: skill?.tools ?? DEFAULT_TOOLS,
+        tools: skill?.tools ? skill.tools : DEFAULT_TOOLS,
         mcpServers: ctx.skills.getMcpServersForQuery(skill),
         permissionMode: "bypassPermissions",
         allowDangerouslySkipPermissions: true,

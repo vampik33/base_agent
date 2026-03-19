@@ -47,6 +47,9 @@ Tests mirror `src/` layout under `test/`. Shared test DB helper in `test/helpers
 - Database: raw `better-sqlite3` SQL (no ORM), migrations in `src/memory/db.ts`
 - Tests: vitest, colocated in `test/` mirroring `src/` structure
 - SQLite files (`*.db`, `data/`) are gitignored — ephemeral per-environment
+- Agent SDK `query()` uses `tools` property (not `allowedTools`) for tool lists
+- Shell commands in `self-evolve.ts`: always `execFileSync` with array args — never `execSync` with string interpolation (command injection risk)
+- Skill `tools` field: `null` = use default tool set; `string[]` = restrict to listed tools only
 
 ## Extending
 

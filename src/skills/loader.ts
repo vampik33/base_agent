@@ -36,7 +36,7 @@ function parseSkillFile(content: string, fallbackName: string): SkillDefinition 
     name,
     description: sections.get("description") ?? "",
     systemPrompt: sections.get("system prompt") ?? "",
-    tools: parseListItems(sections.get("tools") ?? ""),
+    tools: parseOptionalListItems(sections.get("tools")),
     model: sections.get("model")?.trim() || null,
     mcpServers: parseMcpServers(sections.get("mcp servers") ?? ""),
   };
@@ -73,6 +73,13 @@ function parseListItems(text: string): string[] {
     .split("\n")
     .map((line) => line.replace(/^[-*]\s*/, "").trim())
     .filter((item) => item.length > 0);
+}
+
+function parseOptionalListItems(text: string | undefined): string[] | null {
+  if (text === undefined) return null;
+
+  const items = parseListItems(text);
+  return items.length > 0 ? items : null;
 }
 
 function parseMcpServers(text: string): Record<string, unknown> {

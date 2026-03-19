@@ -9,6 +9,7 @@ import { SkillRegistry } from "./skills/registry.js";
 import { Planner } from "./core/planner.js";
 import { AgentScheduler } from "./core/scheduler.js";
 import { SelfEvolver } from "./core/self-evolve.js";
+import { setLogLevel } from "./core/message-logger.js";
 import type { AgentContext } from "./types.js";
 
 async function main(): Promise<void> {
@@ -16,6 +17,7 @@ async function main(): Promise<void> {
 
   // ── Config ──────────────────────────────────────────
   const config = loadConfig();
+  setLogLevel(config.logLevel);
   console.log(`[agent] Work directory: ${config.workDir}`);
 
   // ── Directories ─────────────────────────────────────

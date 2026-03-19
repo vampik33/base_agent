@@ -1,16 +1,17 @@
 import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
 
 const LOG_LEVELS = { quiet: 0, normal: 1, verbose: 2 } as const;
-type LogLevel = keyof typeof LOG_LEVELS;
+export type LogLevel = keyof typeof LOG_LEVELS;
 
-let cachedLevel: number | null = null;
+let currentLevel: number = LOG_LEVELS.normal;
+
+/** Set the log level. Call once at startup with the validated config value. */
+export function setLogLevel(level: LogLevel): void {
+  currentLevel = LOG_LEVELS[level];
+}
 
 function level(): number {
-  if (cachedLevel === null) {
-    const raw = (process.env.LOG_LEVEL ?? "normal").toLowerCase();
-    cachedLevel = LOG_LEVELS[raw as LogLevel] ?? LOG_LEVELS.normal;
-  }
-  return cachedLevel;
+  return currentLevel;
 }
 
 /** Minimum level check — keeps call sites readable. */

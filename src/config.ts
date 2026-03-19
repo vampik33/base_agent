@@ -21,6 +21,9 @@ const configSchema = z.object({
   defaultBranch: z.string().min(1).default("main"),
   selfEvolveBranch: z.string().default("evolve"),
 
+  // Logging
+  logLevel: z.enum(["quiet", "normal", "verbose"]).default("normal"),
+
   // System prompt
   defaultSystemPrompt: z.string().default(
     "You are an autonomous AI agent. Complete the given task thoroughly and report your results."
@@ -39,6 +42,7 @@ export function loadConfig(): Config {
     selfEvolveEnabled: process.env.SELF_EVOLVE_ENABLED,
     defaultBranch: process.env.DEFAULT_BRANCH,
     selfEvolveBranch: process.env.SELF_EVOLVE_BRANCH,
+    logLevel: process.env.LOG_LEVEL,
     defaultSystemPrompt: process.env.DEFAULT_SYSTEM_PROMPT,
   };
 
