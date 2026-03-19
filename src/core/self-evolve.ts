@@ -4,7 +4,7 @@ import type Database from "better-sqlite3";
 import type { Config } from "../config.js";
 import type { ModelProfileRegistry } from "../models/profiles.js";
 import { buildModelEnv } from "../util.js";
-import { logMessage } from "./message-logger.js";
+import type { MessageLogger } from "./message-logger.js";
 
 const PROTECTED_FILES = new Set([
   "src/core/self-evolve.ts",
@@ -29,7 +29,8 @@ export class SelfEvolver {
   constructor(
     private db: Database.Database,
     private config: Config,
-    private models: ModelProfileRegistry
+    private models: ModelProfileRegistry,
+    private logger: MessageLogger
   ) {
     const recentFailures = this.db
       .prepare(`
@@ -106,9 +107,12 @@ export class SelfEvolver {
 
     const description = objective ?? "Analyze recent task results and identify improvements to make";
     let diff = "";
+    let validatedFiles: string[] = [];
 
     try {
-      diff = await this.attemptEvolution(cwd, description);
+      const result = await this.attemptEvolution(cwd, description);
+      diff = result.diff;
+      validatedFiles = result.files;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err);
       if (!(err instanceof EvolutionFailure)) {
@@ -124,8 +128,8 @@ export class SelfEvolver {
     let commitHash = "";
 
     try {
-      // All gates passed -- commit and merge
-      execFileSync("git", ["add", "-A"], { cwd });
+      // All gates passed -- stage only validated files, then commit and merge
+      execFileSync("git", ["add", "--", ...validatedFiles], { cwd });
       diff = execFileSync("git", ["diff", "--cached"], { cwd, encoding: "utf-8" }).trim();
       execFileSync("git", ["commit", "-m", `self-evolve: ${description.slice(0, 72)}`], { cwd, stdio: "pipe" });
       commitHash = execFileSync("git", ["rev-parse", "HEAD"], { cwd, encoding: "utf-8" }).trim();
@@ -150,7 +154,7 @@ export class SelfEvolver {
   }
 
   /** Run the agent, validate changes, and run quality gates. Throws on failure. */
-  private async attemptEvolution(cwd: string, description: string): Promise<string> {
+  private async attemptEvolution(cwd: string, description: string): Promise<{ diff: string; files: string[] }> {
     const profile = this.models.getDefault();
     const systemPrompt = this.buildSystemPrompt();
     const prompt = this.buildPrompt(description);
@@ -168,7 +172,7 @@ export class SelfEvolver {
         cwd,
       },
     })) {
-      logMessage("self-evolve", message);
+      this.logger.log("self-evolve", message);
     }
 
     const diff = execFileSync("git", ["diff"], { cwd, encoding: "utf-8" }).trim();
@@ -203,7 +207,7 @@ export class SelfEvolver {
     // Gate 2: Tests
     this.runGate(cwd, "npm", ["test"], "Tests");
 
-    return diff;
+    return { diff, files: allChanged };
   }
 
   private runGate(cwd: string, cmd: string, args: string[], label: string): void {

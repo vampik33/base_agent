@@ -3,6 +3,9 @@ import type { AgentContext, Task } from "../types.js";
 import { executeTask } from "./executor.js";
 import { formatDuration } from "../util.js";
 
+/** Maximum number of memory entries to retain after each tick. */
+const MAX_MEMORY_ENTRIES = 1000;
+
 interface RawScheduleRow {
   id: number;
   name: string;
@@ -64,6 +67,11 @@ export class AgentScheduler {
       while (task) {
         await this.executeAndRecord(task);
         task = this.ctx.planner.dequeueNext();
+      }
+
+      const evicted = this.ctx.memory.evictOld(MAX_MEMORY_ENTRIES);
+      if (evicted > 0) {
+        console.log(`[scheduler] Evicted ${evicted} old memory entries (limit: ${MAX_MEMORY_ENTRIES}).`);
       }
     } finally {
       this.running = false;

@@ -4,6 +4,7 @@ import type { Planner } from "./core/planner.js";
 import type { MemoryStore } from "./memory/store.js";
 import type { SkillRegistry } from "./skills/registry.js";
 import type { ModelProfileRegistry } from "./models/profiles.js";
+import type { MessageLogger } from "./core/message-logger.js";
 
 // Task
 
@@ -127,4 +128,5 @@ export interface AgentContext {
   memory: MemoryStore;
   skills: SkillRegistry;
   models: ModelProfileRegistry;
+  logger: MessageLogger;
 }

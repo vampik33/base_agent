@@ -1,7 +1,6 @@
 import { query } from "@anthropic-ai/claude-agent-sdk";
 import type { Task, ExecutionResult, AgentContext } from "../types.js";
 import { buildModelEnv } from "../util.js";
-import { logMessage } from "./message-logger.js";
 
 const DEFAULT_TOOLS = ["Read", "Write", "Edit", "Bash", "Glob", "Grep", "WebFetch", "WebSearch"];
 
@@ -53,7 +52,7 @@ export async function executeTask(
         abortController: controller,
       },
     })) {
-      logMessage(`task#${task.id}`, message);
+      ctx.logger.log(`task#${task.id}`, message);
 
       if ("session_id" in message && message.session_id) {
         lastSessionId = message.session_id;

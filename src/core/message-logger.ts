@@ -3,167 +3,167 @@ import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
 const LOG_LEVELS = { quiet: 0, normal: 1, verbose: 2 } as const;
 export type LogLevel = keyof typeof LOG_LEVELS;
 
-let currentLevel: number = LOG_LEVELS.normal;
+export class MessageLogger {
+  private currentLevel: number;
 
-/** Set the log level. Call once at startup with the validated config value. */
-export function setLogLevel(level: LogLevel): void {
-  currentLevel = LOG_LEVELS[level];
-}
+  constructor(level: LogLevel = "normal") {
+    this.currentLevel = LOG_LEVELS[level];
+  }
 
-function level(): number {
-  return currentLevel;
-}
+  setLevel(level: LogLevel): void {
+    this.currentLevel = LOG_LEVELS[level];
+  }
 
-/** Minimum level check — keeps call sites readable. */
-function at(min: LogLevel): boolean {
-  return level() >= LOG_LEVELS[min];
-}
-
-/**
- * Log an SDK message at the appropriate verbosity.
- * Best-effort: never throws.
- */
-export function logMessage(tag: string, message: SDKMessage): void {
-  try {
-    logMessageInner(tag, message);
-  } catch (err) {
+  /**
+   * Log an SDK message at the appropriate verbosity.
+   * Best-effort: never throws.
+   */
+  log(tag: string, message: SDKMessage): void {
     try {
-      console.error(`[${tag}] Log error (message.type=${message?.type ?? "?"}):`, err);
-    } catch {
-      // Absolute last resort — don't let logging crash the agent
+      this.logInner(tag, message);
+    } catch (err) {
+      try {
+        console.error(`[${tag}] Log error (message.type=${message?.type ?? "?"}):`, err);
+      } catch {
+        // Absolute last resort — don't let logging crash the agent
+      }
     }
   }
-}
 
-function logMessageInner(tag: string, message: SDKMessage): void {
-  switch (message.type) {
-    case "assistant": {
-      if (!message.message?.content) break;
-      for (const block of message.message.content) {
-        if ("type" in block && block.type === "thinking" && "thinking" in block) {
-          if (at("verbose")) {
-            console.log(`[${tag}] 🧠 Thinking: ${truncate(String(block.thinking), 500)}`);
-          }
-        } else if ("type" in block && block.type === "text" && "text" in block) {
-          if (at("normal")) {
-            console.log(`[${tag}] 💬 ${truncate(String(block.text), 1000)}`);
-          }
-        } else if ("type" in block && block.type === "tool_use") {
-          if (at("normal")) {
-            const toolBlock = block as { name: string; input: unknown };
-            if (at("verbose")) {
-              const inputStr = safeStringify(toolBlock.input);
-              console.log(`[${tag}] 🔧 Tool: ${toolBlock.name} | Input: ${truncate(inputStr, 300)}`);
-            } else {
-              console.log(`[${tag}] 🔧 Tool: ${toolBlock.name}`);
+  private at(min: LogLevel): boolean {
+    return this.currentLevel >= LOG_LEVELS[min];
+  }
+
+  private logInner(tag: string, message: SDKMessage): void {
+    switch (message.type) {
+      case "assistant": {
+        if (!message.message?.content) break;
+        for (const block of message.message.content) {
+          if ("type" in block && block.type === "thinking" && "thinking" in block) {
+            if (this.at("verbose")) {
+              console.log(`[${tag}] 🧠 Thinking: ${truncate(String(block.thinking), 500)}`);
+            }
+          } else if ("type" in block && block.type === "text" && "text" in block) {
+            if (this.at("normal")) {
+              console.log(`[${tag}] 💬 ${truncate(String(block.text), 1000)}`);
+            }
+          } else if ("type" in block && block.type === "tool_use") {
+            if (this.at("normal")) {
+              const toolBlock = block as { name: string; input: unknown };
+              if (this.at("verbose")) {
+                const inputStr = safeStringify(toolBlock.input);
+                console.log(`[${tag}] 🔧 Tool: ${toolBlock.name} | Input: ${truncate(inputStr, 300)}`);
+              } else {
+                console.log(`[${tag}] 🔧 Tool: ${toolBlock.name}`);
+              }
             }
           }
         }
-      }
-      if (message.error) {
-        // Always log assistant errors
-        console.log(`[${tag}] ⚠️  Assistant error: ${message.error}`);
-      }
-      break;
-    }
-
-    case "user": {
-      if (!at("verbose")) break;
-      if (message.tool_use_result !== undefined) {
-        const result = typeof message.tool_use_result === "string"
-          ? message.tool_use_result
-          : safeStringify(message.tool_use_result);
-        console.log(`[${tag}] ← Tool result: ${truncate(result, 300)}`);
-      }
-      break;
-    }
-
-    case "result": {
-      // Always log results
-      const cost = `$${message.total_cost_usd.toFixed(4)}`;
-      const turns = message.num_turns;
-      const duration = `${(message.duration_ms / 1000).toFixed(1)}s`;
-      if (message.subtype === "success") {
-        console.log(`[${tag}] ✅ Result (${turns} turns, ${duration}, ${cost}): ${truncate(message.result, 500)}`);
-      } else {
-        const errors = message.errors.join("; ") || message.subtype;
-        console.log(`[${tag}] ❌ Error (${turns} turns, ${duration}, ${cost}): ${errors}`);
-      }
-      break;
-    }
-
-    case "system": {
-      const sub = "subtype" in message ? message.subtype : "unknown";
-      switch (sub) {
-        case "init": {
-          if (at("normal")) {
-            const init = message as { model?: string; tools?: string[] };
-            console.log(`[${tag}] ⚙️  Init: model=${init.model ?? "?"}, tools=[${(init.tools ?? []).join(", ")}]`);
-          }
-          break;
+        if (message.error) {
+          // Always log assistant errors
+          console.log(`[${tag}] ⚠️  Assistant error: ${message.error}`);
         }
-        case "api_retry": {
-          // Always log retries — they signal problems
-          const retry = message as { attempt: number; max_retries: number; error: string };
-          console.log(`[${tag}] 🔄 API retry ${retry.attempt}/${retry.max_retries}: ${retry.error}`);
-          break;
+        break;
+      }
+
+      case "user": {
+        if (!this.at("verbose")) break;
+        if (message.tool_use_result !== undefined) {
+          const result = typeof message.tool_use_result === "string"
+            ? message.tool_use_result
+            : safeStringify(message.tool_use_result);
+          console.log(`[${tag}] ← Tool result: ${truncate(result, 300)}`);
         }
-        case "status": {
-          if (at("verbose")) {
-            const status = message as { status: string | null };
-            if (status.status) {
-              console.log(`[${tag}] 📊 Status: ${status.status}`);
+        break;
+      }
+
+      case "result": {
+        // Always log results
+        const cost = `$${message.total_cost_usd.toFixed(4)}`;
+        const turns = message.num_turns;
+        const duration = `${(message.duration_ms / 1000).toFixed(1)}s`;
+        if (message.subtype === "success") {
+          console.log(`[${tag}] ✅ Result (${turns} turns, ${duration}, ${cost}): ${truncate(message.result, 500)}`);
+        } else {
+          const errors = message.errors.join("; ") || message.subtype;
+          console.log(`[${tag}] ❌ Error (${turns} turns, ${duration}, ${cost}): ${errors}`);
+        }
+        break;
+      }
+
+      case "system": {
+        const sub = "subtype" in message ? message.subtype : "unknown";
+        switch (sub) {
+          case "init": {
+            if (this.at("normal")) {
+              const init = message as { model?: string; tools?: string[] };
+              console.log(`[${tag}] ⚙️  Init: model=${init.model ?? "?"}, tools=[${(init.tools ?? []).join(", ")}]`);
             }
+            break;
           }
-          break;
-        }
-        case "task_started": {
-          if (at("normal")) {
-            const task = message as { description: string; task_type?: string };
-            console.log(`[${tag}] 🚀 Subagent started: ${task.description} (${task.task_type ?? "default"})`);
+          case "api_retry": {
+            // Always log retries — they signal problems
+            const retry = message as { attempt: number; max_retries: number; error: string };
+            console.log(`[${tag}] 🔄 API retry ${retry.attempt}/${retry.max_retries}: ${retry.error}`);
+            break;
           }
-          break;
-        }
-        case "task_progress": {
-          if (at("verbose")) {
-            const progress = message as { description: string; summary?: string };
-            console.log(`[${tag}] 📈 Subagent progress: ${progress.summary ?? progress.description}`);
+          case "status": {
+            if (this.at("verbose")) {
+              const status = message as { status: string | null };
+              if (status.status) {
+                console.log(`[${tag}] 📊 Status: ${status.status}`);
+              }
+            }
+            break;
           }
-          break;
-        }
-        case "task_notification": {
-          if (at("normal")) {
-            const notif = message as { status: string; summary: string };
-            console.log(`[${tag}] 📋 Subagent ${notif.status}: ${truncate(notif.summary, 200)}`);
+          case "task_started": {
+            if (this.at("normal")) {
+              const task = message as { description: string; task_type?: string };
+              console.log(`[${tag}] 🚀 Subagent started: ${task.description} (${task.task_type ?? "default"})`);
+            }
+            break;
           }
-          break;
+          case "task_progress": {
+            if (this.at("verbose")) {
+              const progress = message as { description: string; summary?: string };
+              console.log(`[${tag}] 📈 Subagent progress: ${progress.summary ?? progress.description}`);
+            }
+            break;
+          }
+          case "task_notification": {
+            if (this.at("normal")) {
+              const notif = message as { status: string; summary: string };
+              console.log(`[${tag}] 📋 Subagent ${notif.status}: ${truncate(notif.summary, 200)}`);
+            }
+            break;
+          }
+          default:
+            break;
         }
-        default:
-          break;
+        break;
       }
-      break;
-    }
 
-    case "tool_progress": {
-      if (at("verbose")) {
-        const tp = message as { tool_name: string; elapsed_time_seconds: number };
-        if (tp.elapsed_time_seconds > 5) {
-          console.log(`[${tag}] ⏳ ${tp.tool_name} running for ${tp.elapsed_time_seconds.toFixed(0)}s...`);
+      case "tool_progress": {
+        if (this.at("verbose")) {
+          const tp = message as { tool_name: string; elapsed_time_seconds: number };
+          if (tp.elapsed_time_seconds > 5) {
+            console.log(`[${tag}] ⏳ ${tp.tool_name} running for ${tp.elapsed_time_seconds.toFixed(0)}s...`);
+          }
         }
+        break;
       }
-      break;
-    }
 
-    case "tool_use_summary": {
-      if (at("normal")) {
-        const tus = message as { summary: string };
-        console.log(`[${tag}] 📝 Tool summary: ${truncate(tus.summary, 300)}`);
+      case "tool_use_summary": {
+        if (this.at("normal")) {
+          const tus = message as { summary: string };
+          console.log(`[${tag}] 📝 Tool summary: ${truncate(tus.summary, 300)}`);
+        }
+        break;
       }
-      break;
-    }
 
-    default:
-      break;
+      default:
+        break;
+    }
   }
 }
 

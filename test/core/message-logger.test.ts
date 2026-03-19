@@ -1,11 +1,13 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { logMessage, setLogLevel } from "../../src/core/message-logger.js";
+import { MessageLogger } from "../../src/core/message-logger.js";
 import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
 
 // Capture console output
 let consoleOutput: string[];
 const originalLog = console.log;
 const originalError = console.error;
+
+let logger: MessageLogger;
 
 beforeEach(() => {
   consoleOutput = [];
@@ -15,20 +17,20 @@ beforeEach(() => {
   console.error = (...args: unknown[]) => {
     consoleOutput.push(args.map(String).join(" "));
   };
+  logger = new MessageLogger("normal");
 });
 
 afterEach(() => {
   console.log = originalLog;
   console.error = originalError;
-  setLogLevel("normal"); // Reset to default
 });
 
-describe("setLogLevel", () => {
+describe("setLevel", () => {
   it("controls which messages are logged", () => {
-    setLogLevel("quiet");
+    logger.setLevel("quiet");
 
     // At quiet level, normal assistant text should not appear
-    logMessage("test", {
+    logger.log("test", {
       type: "assistant",
       message: {
         content: [{ type: "text", text: "hello" }],
@@ -39,11 +41,11 @@ describe("setLogLevel", () => {
   });
 });
 
-describe("logMessage", () => {
+describe("log", () => {
   it("logs result messages at any level", () => {
-    setLogLevel("quiet");
+    logger.setLevel("quiet");
 
-    logMessage("test", {
+    logger.log("test", {
       type: "result",
       subtype: "success",
       result: "All done",
@@ -60,7 +62,7 @@ describe("logMessage", () => {
   });
 
   it("logs error results", () => {
-    logMessage("test", {
+    logger.log("test", {
       type: "result",
       subtype: "error",
       errors: ["something broke"],
@@ -76,9 +78,7 @@ describe("logMessage", () => {
   });
 
   it("logs assistant text at normal level", () => {
-    setLogLevel("normal");
-
-    logMessage("tag", {
+    logger.log("tag", {
       type: "assistant",
       message: {
         content: [{ type: "text", text: "Hello world" }],
@@ -91,9 +91,7 @@ describe("logMessage", () => {
   });
 
   it("hides thinking blocks at normal level", () => {
-    setLogLevel("normal");
-
-    logMessage("test", {
+    logger.log("test", {
       type: "assistant",
       message: {
         content: [{ type: "thinking", thinking: "Let me think..." }],
@@ -104,9 +102,9 @@ describe("logMessage", () => {
   });
 
   it("shows thinking blocks at verbose level", () => {
-    setLogLevel("verbose");
+    logger.setLevel("verbose");
 
-    logMessage("test", {
+    logger.log("test", {
       type: "assistant",
       message: {
         content: [{ type: "thinking", thinking: "Let me think..." }],
@@ -118,9 +116,7 @@ describe("logMessage", () => {
   });
 
   it("shows tool names at normal level without input details", () => {
-    setLogLevel("normal");
-
-    logMessage("test", {
+    logger.log("test", {
       type: "assistant",
       message: {
         content: [{ type: "tool_use", name: "Read", input: { path: "/foo" } }],
@@ -133,9 +129,9 @@ describe("logMessage", () => {
   });
 
   it("shows tool input at verbose level", () => {
-    setLogLevel("verbose");
+    logger.setLevel("verbose");
 
-    logMessage("test", {
+    logger.log("test", {
       type: "assistant",
       message: {
         content: [{ type: "tool_use", name: "Read", input: { path: "/foo" } }],
@@ -148,9 +144,9 @@ describe("logMessage", () => {
   });
 
   it("always logs assistant errors regardless of level", () => {
-    setLogLevel("quiet");
+    logger.setLevel("quiet");
 
-    logMessage("test", {
+    logger.log("test", {
       type: "assistant",
       message: { content: [] },
       error: "Something went wrong",
@@ -162,24 +158,23 @@ describe("logMessage", () => {
 
   it("never throws even with malformed messages", () => {
     expect(() => {
-      logMessage("test", null as unknown as SDKMessage);
+      logger.log("test", null as unknown as SDKMessage);
     }).not.toThrow();
 
     expect(() => {
-      logMessage("test", {} as unknown as SDKMessage);
+      logger.log("test", {} as unknown as SDKMessage);
     }).not.toThrow();
   });
 
   it("logs user tool results at verbose level only", () => {
-    setLogLevel("normal");
-    logMessage("test", {
+    logger.log("test", {
       type: "user",
       tool_use_result: "file contents here",
     } as unknown as SDKMessage);
     expect(consoleOutput).toHaveLength(0);
 
-    setLogLevel("verbose");
-    logMessage("test", {
+    logger.setLevel("verbose");
+    logger.log("test", {
       type: "user",
       tool_use_result: "file contents here",
     } as unknown as SDKMessage);
@@ -188,9 +183,7 @@ describe("logMessage", () => {
   });
 
   it("logs system init at normal level", () => {
-    setLogLevel("normal");
-
-    logMessage("test", {
+    logger.log("test", {
       type: "system",
       subtype: "init",
       model: "claude-test",
@@ -203,9 +196,9 @@ describe("logMessage", () => {
   });
 
   it("always logs api_retry regardless of level", () => {
-    setLogLevel("quiet");
+    logger.setLevel("quiet");
 
-    logMessage("test", {
+    logger.log("test", {
       type: "system",
       subtype: "api_retry",
       attempt: 1,
@@ -216,5 +209,24 @@ describe("logMessage", () => {
     expect(consoleOutput).toHaveLength(1);
     expect(consoleOutput[0]).toContain("retry");
     expect(consoleOutput[0]).toContain("rate limited");
+  });
+
+  it("each instance maintains independent state", () => {
+    const quietLogger = new MessageLogger("quiet");
+    const verboseLogger = new MessageLogger("verbose");
+
+    const msg = {
+      type: "assistant",
+      message: {
+        content: [{ type: "text", text: "hello" }],
+      },
+    } as unknown as SDKMessage;
+
+    quietLogger.log("q", msg);
+    expect(consoleOutput).toHaveLength(0);
+
+    verboseLogger.log("v", msg);
+    expect(consoleOutput).toHaveLength(1);
+    expect(consoleOutput[0]).toContain("[v]");
   });
 });

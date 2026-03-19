@@ -9,7 +9,7 @@ import { SkillRegistry } from "./skills/registry.js";
 import { Planner } from "./core/planner.js";
 import { AgentScheduler } from "./core/scheduler.js";
 import { SelfEvolver } from "./core/self-evolve.js";
-import { setLogLevel } from "./core/message-logger.js";
+import { MessageLogger } from "./core/message-logger.js";
 import type { AgentContext } from "./types.js";
 
 async function main(): Promise<void> {
@@ -17,7 +17,7 @@ async function main(): Promise<void> {
 
   // ── Config ──────────────────────────────────────────
   const config = loadConfig();
-  setLogLevel(config.logLevel);
+  const logger = new MessageLogger(config.logLevel);
   console.log(`[agent] Work directory: ${config.workDir}`);
 
   // ── Directories ─────────────────────────────────────
@@ -58,6 +58,7 @@ async function main(): Promise<void> {
       memory,
       skills,
       models,
+      logger,
     };
 
     // ── Scheduler ───────────────────────────────────────
@@ -91,7 +92,7 @@ async function main(): Promise<void> {
 
     // ── Self-evolution (after initial tick) ──────────────
     if (config.selfEvolveEnabled) {
-      const evolver = new SelfEvolver(db, config, models);
+      const evolver = new SelfEvolver(db, config, models, logger);
       if (await evolver.evolve()) {
         db.close();
         process.exit(100); // Signal run.sh to rebuild and restart
