@@ -10,8 +10,11 @@ describe("loadConfig", () => {
     delete process.env.API_BASE_URL;
     delete process.env.DEFAULT_MODEL;
     delete process.env.CRON_EXPRESSION;
+    delete process.env.DAILY_BUDGET_USD;
+    delete process.env.MAX_BUDGET_PER_TASK_USD;
     delete process.env.WORK_DIR;
     delete process.env.SELF_EVOLVE_ENABLED;
+    delete process.env.DEFAULT_BRANCH;
     delete process.env.SELF_EVOLVE_BRANCH;
     delete process.env.DEFAULT_SYSTEM_PROMPT;
   });
@@ -41,7 +44,10 @@ describe("loadConfig", () => {
     const config = loadConfig();
     expect(config.defaultModel).toBe("claude-sonnet-4-20250514");
     expect(config.cronExpression).toBe("*/10 * * * *");
+    expect(config.dailyBudgetUsd).toBe(20);
+    expect(config.maxBudgetPerTaskUsd).toBe(5);
     expect(config.selfEvolveEnabled).toBe(false);
+    expect(config.defaultBranch).toBe("main");
     expect(config.selfEvolveBranch).toBe("evolve");
   });
 
@@ -64,5 +70,21 @@ describe("loadConfig", () => {
     process.env.API_BASE_URL = "https://custom.api.com";
     const config = loadConfig();
     expect(config.apiBaseUrl).toBe("https://custom.api.com");
+  });
+
+  it("parses numeric budget env vars", () => {
+    process.env.API_KEY = "sk-test";
+    process.env.DAILY_BUDGET_USD = "12.5";
+    process.env.MAX_BUDGET_PER_TASK_USD = "2.25";
+    const config = loadConfig();
+    expect(config.dailyBudgetUsd).toBe(12.5);
+    expect(config.maxBudgetPerTaskUsd).toBe(2.25);
+  });
+
+  it("uses custom DEFAULT_BRANCH", () => {
+    process.env.API_KEY = "sk-test";
+    process.env.DEFAULT_BRANCH = "trunk";
+    const config = loadConfig();
+    expect(config.defaultBranch).toBe("trunk");
   });
 });

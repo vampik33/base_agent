@@ -55,11 +55,11 @@ Set `PREFIX_BASE_URL` and `PREFIX_API_KEY` env vars. Auto-discovered at startup.
 ## Self-Evolution
 
 When `SELF_EVOLVE_ENABLED=true`, the agent can modify its own source code:
-1. Creates `evolve` branch from HEAD
+1. Checks out `DEFAULT_BRANCH` and creates `SELF_EVOLVE_BRANCH` from that branch tip
 2. Runs Agent SDK with self-evolve skill
 3. Gates: `tsc --noEmit` + `npm test` must pass
-4. On success: merge to main, exit with code 100
-5. `run.sh` detects exit 100, rebuilds, and restarts
+4. On success: fast-forward merge back into `DEFAULT_BRANCH`, exit with code 100
+5. `run.sh` detects exit 100, rebuilds, and restarts; if rebuild still fails after revert, it exits non-zero
 
 Protected files (cannot be modified by self-evolution):
 - `src/core/self-evolve.ts`, `src/config.ts`, `run.sh`, `.env`, `.gitignore`

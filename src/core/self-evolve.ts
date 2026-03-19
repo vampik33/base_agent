@@ -63,6 +63,8 @@ export class SelfEvolver {
 
     const cwd = this.config.workDir;
     const branch = this.config.selfEvolveBranch;
+    const baseBranch = this.config.defaultBranch;
+    let originalBranch = "";
 
     // Ensure clean working tree
     try {
@@ -76,12 +78,25 @@ export class SelfEvolver {
       return false;
     }
 
-    // Create/checkout evolve branch from current HEAD
     try {
-      execSync(`git branch -D ${branch} 2>/dev/null || true`, { cwd });
-      execSync(`git checkout -b ${branch}`, { cwd });
+      originalBranch = this.getCurrentBranch(cwd);
     } catch (err) {
-      console.error("[self-evolve] Failed to create branch:", err);
+      console.error("[self-evolve] Failed to detect current branch:", err);
+      return false;
+    }
+
+    // Create/reset evolve branch from configured base branch
+    try {
+      this.checkoutBranch(cwd, baseBranch);
+      execSync(`git branch -D ${branch}`, { cwd, stdio: "ignore" });
+      execSync(`git checkout -B ${branch}`, { cwd, stdio: "pipe" });
+    } catch (err) {
+      try {
+        this.checkoutBranch(cwd, originalBranch);
+      } catch {
+        // Best-effort restore.
+      }
+      console.error(`[self-evolve] Failed to create evolution branch from ${baseBranch}:`, err);
       return false;
     }
 
@@ -118,7 +133,7 @@ export class SelfEvolver {
 
       if (!diff && !untrackedOutput) {
         console.log("[self-evolve] No changes made. Aborting.");
-        this.abortEvolution(cwd, branch);
+        this.abortEvolution(cwd, baseBranch, originalBranch, branch);
         this.logAttempt(description, "", null, "failed", "No changes were made");
         this.consecutiveFailures++;
         return false;
@@ -135,7 +150,7 @@ export class SelfEvolver {
       for (const file of allChanged) {
         if (PROTECTED_FILES.has(file)) {
           console.log(`[self-evolve] Protected file modified: ${file}. Aborting.`);
-          this.abortEvolution(cwd, branch);
+          this.abortEvolution(cwd, baseBranch, originalBranch, branch);
           this.logAttempt(description, diff, null, "failed", `Protected file modified: ${file}`);
           this.consecutiveFailures++;
           return false;
@@ -143,7 +158,7 @@ export class SelfEvolver {
 
         if (!ALLOWED_PATH_PREFIXES.some((prefix) => file.startsWith(prefix))) {
           console.log(`[self-evolve] File outside allowed paths: ${file}. Aborting.`);
-          this.abortEvolution(cwd, branch);
+          this.abortEvolution(cwd, baseBranch, originalBranch, branch);
           this.logAttempt(description, diff, null, "failed", `File outside allowed paths: ${file}`);
           this.consecutiveFailures++;
           return false;
@@ -157,7 +172,7 @@ export class SelfEvolver {
       } catch (err) {
         const stderr = err instanceof Error && "stderr" in err ? String((err as { stderr: unknown }).stderr) : String(err);
         console.log("[self-evolve] Typecheck failed. Aborting.");
-        this.abortEvolution(cwd, branch);
+        this.abortEvolution(cwd, baseBranch, originalBranch, branch);
         this.logAttempt(description, diff, null, "failed", `Typecheck failed:\n${stderr.slice(0, 2000)}`);
         this.consecutiveFailures++;
         return false;
@@ -170,7 +185,7 @@ export class SelfEvolver {
       } catch (err) {
         const stderr = err instanceof Error && "stderr" in err ? String((err as { stderr: unknown }).stderr) : String(err);
         console.log("[self-evolve] Tests failed. Aborting.");
-        this.abortEvolution(cwd, branch);
+        this.abortEvolution(cwd, baseBranch, originalBranch, branch);
         this.logAttempt(description, diff, null, "failed", `Tests failed:\n${stderr.slice(0, 2000)}`);
         this.consecutiveFailures++;
         return false;
@@ -182,9 +197,9 @@ export class SelfEvolver {
       execSync(`git commit -m "self-evolve: ${description.slice(0, 72)}"`, { cwd });
       commitHash = execSync("git rev-parse HEAD", { cwd, encoding: "utf-8" }).trim();
 
-      // Merge to main (fast-forward)
-      execSync("git checkout main", { cwd });
-      execSync(`git merge ${branch}`, { cwd });
+      // Merge back into configured base branch.
+      this.checkoutBranch(cwd, baseBranch);
+      execSync(`git merge --ff-only ${branch}`, { cwd, stdio: "pipe" });
       execSync(`git branch -d ${branch}`, { cwd });
 
       this.logAttempt(description, diff, commitHash, "success", null);
@@ -195,20 +210,31 @@ export class SelfEvolver {
     } catch (err) {
       errorOutput = err instanceof Error ? err.message : String(err);
       console.error("[self-evolve] Unexpected error:", errorOutput);
-      this.abortEvolution(cwd, branch);
+      this.abortEvolution(cwd, baseBranch, originalBranch, branch);
       this.logAttempt(description, diff, null, "failed", errorOutput);
       this.consecutiveFailures++;
       return false;
     }
   }
 
-  private abortEvolution(cwd: string, branch: string): void {
+  private abortEvolution(cwd: string, baseBranch: string, originalBranch: string, branch: string): void {
     try {
-      execSync("git checkout main", { cwd });
-      execSync(`git branch -D ${branch}`, { cwd });
+      this.checkoutBranch(cwd, baseBranch);
+      execSync(`git branch -D ${branch}`, { cwd, stdio: "ignore" });
+      if (originalBranch && originalBranch !== baseBranch) {
+        this.checkoutBranch(cwd, originalBranch);
+      }
     } catch {
       // Best-effort cleanup
     }
+  }
+
+  private getCurrentBranch(cwd: string): string {
+    return execSync("git rev-parse --abbrev-ref HEAD", { cwd, encoding: "utf-8" }).trim();
+  }
+
+  private checkoutBranch(cwd: string, branch: string): void {
+    execSync(`git checkout ${branch}`, { cwd, stdio: "pipe" });
   }
 
   private logAttempt(
