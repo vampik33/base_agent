@@ -101,11 +101,4 @@ describe("Planner", () => {
     expect(failed!.result).toContain("crashed");
   });
 
-  it("calculates today's cost", () => {
-    const task = planner.addTask({ title: "Costly", description: "d" });
-    planner.dequeueNext();
-    planner.completeTask(task.id, "done", 1.5, "s");
-
-    expect(planner.todaysCost()).toBe(1.5);
-  });
 });

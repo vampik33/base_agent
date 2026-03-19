@@ -56,20 +56,12 @@ export class AgentScheduler {
 
     this.running = true;
     try {
-      const spentBeforeScheduling = this.ctx.planner.todaysCost();
-      if (spentBeforeScheduling >= this.ctx.config.dailyBudgetUsd) {
-        console.log(
-          `[scheduler] Daily budget exhausted ($${spentBeforeScheduling.toFixed(2)} / $${this.ctx.config.dailyBudgetUsd.toFixed(2)}).`
-        );
-        return;
-      }
-
       this.checkSchedules();
 
-      let task = this.dequeueNextWithinBudget();
+      let task = this.ctx.planner.dequeueNext();
       while (task) {
         await this.executeAndRecord(task);
-        task = this.dequeueNextWithinBudget();
+        task = this.ctx.planner.dequeueNext();
       }
     } finally {
       this.running = false;
@@ -102,23 +94,6 @@ export class AgentScheduler {
         durationMs: result.durationMs,
       },
     });
-  }
-
-  private dequeueNextWithinBudget(): Task | null {
-    const spentToday = this.ctx.planner.todaysCost();
-    const remainingBudget = this.ctx.config.dailyBudgetUsd - spentToday;
-
-    if (remainingBudget < this.ctx.config.maxBudgetPerTaskUsd) {
-      const pendingTasks = this.ctx.planner.pendingCount();
-      if (pendingTasks > 0) {
-        console.log(
-          `[scheduler] Pausing with ${pendingTasks} pending task(s); remaining daily budget $${remainingBudget.toFixed(2)} is below reserved per-task budget $${this.ctx.config.maxBudgetPerTaskUsd.toFixed(2)}.`
-        );
-      }
-      return null;
-    }
-
-    return this.ctx.planner.dequeueNext();
   }
 
   private checkSchedules(): void {

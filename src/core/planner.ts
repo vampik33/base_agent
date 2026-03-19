@@ -127,13 +127,6 @@ export class Planner {
     return row.count;
   }
 
-  todaysCost(): number {
-    const row = this.db
-      .prepare("SELECT COALESCE(SUM(cost_usd), 0) as total FROM tasks WHERE date(updated_at) = date('now')")
-      .get() as { total: number };
-    return row.total;
-  }
-
   hasPendingTask(source: string, title: string): boolean {
     const row = this.db
       .prepare("SELECT COUNT(*) as count FROM tasks WHERE status = 'pending' AND source = ? AND title = ?")

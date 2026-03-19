@@ -6,8 +6,6 @@ const CONFIG_ENV_VARS = [
   "API_BASE_URL",
   "DEFAULT_MODEL",
   "CRON_EXPRESSION",
-  "DAILY_BUDGET_USD",
-  "MAX_BUDGET_PER_TASK_USD",
   "WORK_DIR",
   "SELF_EVOLVE_ENABLED",
   "DEFAULT_BRANCH",
@@ -54,8 +52,6 @@ describe("loadConfig", () => {
     const config = loadConfig();
     expect(config.defaultModel).toBe("claude-sonnet-4-20250514");
     expect(config.cronExpression).toBe("*/10 * * * *");
-    expect(config.dailyBudgetUsd).toBe(20);
-    expect(config.maxBudgetPerTaskUsd).toBe(5);
     expect(config.selfEvolveEnabled).toBe(false);
     expect(config.defaultBranch).toBe("main");
     expect(config.selfEvolveBranch).toBe("evolve");
@@ -80,15 +76,6 @@ describe("loadConfig", () => {
     process.env.API_BASE_URL = "https://custom.api.com";
     const config = loadConfig();
     expect(config.apiBaseUrl).toBe("https://custom.api.com");
-  });
-
-  it("parses numeric budget env vars", () => {
-    process.env.API_KEY = "sk-test";
-    process.env.DAILY_BUDGET_USD = "12.5";
-    process.env.MAX_BUDGET_PER_TASK_USD = "2.25";
-    const config = loadConfig();
-    expect(config.dailyBudgetUsd).toBe(12.5);
-    expect(config.maxBudgetPerTaskUsd).toBe(2.25);
   });
 
   it("uses custom DEFAULT_BRANCH", () => {

@@ -37,6 +37,17 @@ npm test           # Run tests (vitest)
 - **src/core/self-evolve.ts** — Self-modification: branch → edit → typecheck → test → merge → restart
 - **src/index.ts** — Bootstrap + wiring
 
+### Tests
+
+Tests mirror `src/` layout under `test/`. Shared test DB helper in `test/helpers/db.ts`. Run: `npm test` (vitest).
+
+## Conventions
+
+- Config: Zod v4 schema with `z.coerce` for env var parsing, `safeParse` with formatted errors
+- Database: raw `better-sqlite3` SQL (no ORM), migrations in `src/memory/db.ts`
+- Tests: vitest, colocated in `test/` mirroring `src/` structure
+- SQLite files (`*.db`, `data/`) are gitignored — ephemeral per-environment
+
 ## Extending
 
 ### Add a skill
@@ -62,3 +73,5 @@ When `SELF_EVOLVE_ENABLED=true`, the agent can modify its own source code:
 
 Protected files (cannot be modified by self-evolution):
 - `src/core/self-evolve.ts`, `src/config.ts`, `run.sh`, `.env`, `.gitignore`
+
+**Gotcha:** Exit code 100 is the signal for `run.sh` to rebuild and restart. Do not use exit code 100 for other purposes.
