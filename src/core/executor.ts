@@ -4,9 +4,10 @@ import { buildModelEnv } from "../util.js";
 
 const DEFAULT_TOOLS = ["Read", "Write", "Edit", "Bash", "Glob", "Grep", "WebFetch", "WebSearch"];
 
-/**
- * Execute a task using the Agent SDK query().
- */
+const INSTRUCTIONS =
+  "Complete this task thoroughly. Use available tools as needed. " +
+  "Report your results clearly. If you encounter issues, describe what went wrong.";
+
 export async function executeTask(
   task: Task,
   ctx: AgentContext,
@@ -24,6 +25,17 @@ export async function executeTask(
 
   let accumulatedCostUsd = 0;
   let lastSessionId = "";
+
+  function failureResult(summary: string, abortReason?: "timeout" | "shutdown"): ExecutionResult {
+    return {
+      summary,
+      costUsd: accumulatedCostUsd,
+      sessionId: lastSessionId,
+      success: false,
+      durationMs: Date.now() - startTime,
+      abortReason,
+    };
+  }
 
   try {
     for await (const message of query({
@@ -43,8 +55,7 @@ export async function executeTask(
       if (message.type === "assistant" && message.message?.content) {
         for (const block of message.message.content) {
           if ("text" in block && block.text) {
-            const preview = block.text.slice(0, 200);
-            console.log(`[executor] Task #${task.id}: ${preview}`);
+            console.log(`[executor] Task #${task.id}: ${block.text.slice(0, 200)}`);
           }
         }
       }
@@ -55,62 +66,38 @@ export async function executeTask(
 
       if (message.type === "result") {
         accumulatedCostUsd = message.total_cost_usd;
-        const durationMs = Date.now() - startTime;
 
-        let summary: string;
-        if (message.subtype === "success") {
-          summary = message.result;
-        } else {
-          summary = message.errors.join("\n") || `Task ended with: ${message.subtype}`;
-        }
+        const summary = message.subtype === "success"
+          ? message.result
+          : message.errors.join("\n") || `Task ended with: ${message.subtype}`;
 
         return {
           summary,
           costUsd: message.total_cost_usd,
           sessionId: message.session_id,
           success: message.subtype === "success",
-          durationMs,
+          durationMs: Date.now() - startTime,
         };
       }
     }
 
     if (controller.signal.aborted) {
-      return {
-        summary: "Task aborted due to shutdown.",
-        costUsd: accumulatedCostUsd,
-        sessionId: lastSessionId,
-        success: false,
-        durationMs: Date.now() - startTime,
-        abortReason: "shutdown",
-      };
+      return failureResult("Task aborted due to shutdown.", "shutdown");
     }
 
-    return {
-      summary: "Execution ended unexpectedly without a result message.",
-      costUsd: accumulatedCostUsd,
-      sessionId: lastSessionId,
-      success: false,
-      durationMs: Date.now() - startTime,
-    };
+    return failureResult("Execution ended unexpectedly without a result message.");
   } catch (err) {
-    const isShutdown = controller.signal.aborted && controller.signal.reason === "shutdown";
-    const reason = isShutdown
-      ? "Task aborted due to shutdown."
-      : `Task execution error: ${err instanceof Error ? err.message : String(err)}`;
-    return {
-      summary: reason,
-      costUsd: accumulatedCostUsd,
-      sessionId: lastSessionId,
-      success: false,
-      durationMs: Date.now() - startTime,
-      abortReason: isShutdown ? "shutdown" : undefined,
-    };
+    if (controller.signal.aborted && controller.signal.reason === "shutdown") {
+      return failureResult("Task aborted due to shutdown.", "shutdown");
+    }
+
+    const errorMsg = err instanceof Error ? err.message : String(err);
+    return failureResult(`Task execution error: ${errorMsg}`);
   }
 }
 
 function buildPrompt(task: Task, ctx: AgentContext): string {
   const recentMemories = ctx.memory.getRecent(10);
-
   const sections = [`# Task: ${task.title}\n\n${task.description}`];
 
   if (recentMemories.length > 0) {
@@ -120,11 +107,7 @@ function buildPrompt(task: Task, ctx: AgentContext): string {
     sections.push(`## Recent Activity\n${memoryList}`);
   }
 
-  sections.push(
-    "## Instructions\n" +
-    "Complete this task thoroughly. Use available tools as needed. " +
-    "Report your results clearly. If you encounter issues, describe what went wrong."
-  );
+  sections.push(`## Instructions\n${INSTRUCTIONS}`);
 
   return sections.join("\n\n");
 }

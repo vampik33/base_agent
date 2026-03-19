@@ -15,6 +15,14 @@ const CONFIG_ENV_VARS = [
   "DEFAULT_SYSTEM_PROMPT",
 ] as const;
 
+function restoreEnvVar(key: string, value: string | undefined): void {
+  if (value === undefined) {
+    delete process.env[key];
+  } else {
+    process.env[key] = value;
+  }
+}
+
 describe("loadConfig", () => {
   const savedEnv: Record<string, string | undefined> = {};
 
@@ -27,11 +35,7 @@ describe("loadConfig", () => {
 
   afterEach(() => {
     for (const key of CONFIG_ENV_VARS) {
-      if (savedEnv[key] === undefined) {
-        delete process.env[key];
-      } else {
-        process.env[key] = savedEnv[key];
-      }
+      restoreEnvVar(key, savedEnv[key]);
     }
   });
 

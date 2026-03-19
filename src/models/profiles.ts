@@ -15,15 +15,13 @@ export class ModelProfileRegistry {
   }
 
   resolve(nameOrModel: string): ModelProfile {
-    // Exact profile name match
     const byName = this.profiles.get(nameOrModel);
     if (byName) return byName;
 
-    // Match by model string
-    const byModel = [...this.profiles.values()].find((p) => p.model === nameOrModel);
-    if (byModel) return byModel;
+    for (const profile of this.profiles.values()) {
+      if (profile.model === nameOrModel) return profile;
+    }
 
-    // Fall back to default profile
     return this.getDefault();
   }
 

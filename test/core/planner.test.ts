@@ -22,14 +22,15 @@ describe("Planner", () => {
     });
 
     expect(task.id).toBeGreaterThan(0);
-    expect(task.title).toBe("Test task");
-    expect(task.status).toBe("pending");
-    expect(task.priority).toBe(10);
-    expect(task.source).toBe("user");
+    expect(task).toMatchObject({
+      title: "Test task",
+      status: "pending",
+      priority: 10,
+      source: "user",
+    });
 
     const retrieved = planner.getById(task.id);
-    expect(retrieved).not.toBeNull();
-    expect(retrieved!.title).toBe("Test task");
+    expect(retrieved).toMatchObject({ title: "Test task" });
   });
 
   it("dequeues highest priority task first", () => {
@@ -38,9 +39,7 @@ describe("Planner", () => {
     planner.addTask({ title: "Medium priority", description: "d", priority: 10 });
 
     const task = planner.dequeueNext();
-    expect(task).not.toBeNull();
-    expect(task!.title).toBe("High priority");
-    expect(task!.status).toBe("running");
+    expect(task).toMatchObject({ title: "High priority", status: "running" });
   });
 
   it("returns null when no pending tasks", () => {
@@ -52,11 +51,13 @@ describe("Planner", () => {
     planner.dequeueNext();
     planner.completeTask(task.id, "Done!", 0.5, "session-123");
 
-    const completed = planner.getById(task.id)!;
-    expect(completed.status).toBe("completed");
-    expect(completed.result).toBe("Done!");
-    expect(completed.costUsd).toBe(0.5);
-    expect(completed.sessionId).toBe("session-123");
+    const completed = planner.getById(task.id);
+    expect(completed).toMatchObject({
+      status: "completed",
+      result: "Done!",
+      costUsd: 0.5,
+      sessionId: "session-123",
+    });
   });
 
   it("fails a task with error", () => {
@@ -64,9 +65,8 @@ describe("Planner", () => {
     planner.dequeueNext();
     planner.failTask(task.id, "Something broke", 0.1, "session-456");
 
-    const failed = planner.getById(task.id)!;
-    expect(failed.status).toBe("failed");
-    expect(failed.result).toBe("Something broke");
+    const failed = planner.getById(task.id);
+    expect(failed).toMatchObject({ status: "failed", result: "Something broke" });
   });
 
   it("lists pending tasks in priority order", () => {
@@ -74,9 +74,7 @@ describe("Planner", () => {
     planner.addTask({ title: "A", description: "d", priority: 5 });
 
     const pending = planner.listPending();
-    expect(pending).toHaveLength(2);
-    expect(pending[0]!.title).toBe("A");
-    expect(pending[1]!.title).toBe("B");
+    expect(pending.map((t) => t.title)).toEqual(["A", "B"]);
   });
 
   it("counts pending tasks", () => {
@@ -96,12 +94,11 @@ describe("Planner", () => {
     const task = planner.addTask({ title: "Orphan", description: "d" });
     planner.dequeueNext();
 
-    const recovered = planner.recoverOrphaned();
-    expect(recovered).toBe(1);
+    expect(planner.recoverOrphaned()).toBe(1);
 
-    const failed = planner.getById(task.id)!;
-    expect(failed.status).toBe("failed");
-    expect(failed.result).toContain("crashed");
+    const failed = planner.getById(task.id);
+    expect(failed).toMatchObject({ status: "failed" });
+    expect(failed!.result).toContain("crashed");
   });
 
   it("calculates today's cost", () => {

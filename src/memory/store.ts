@@ -9,18 +9,20 @@ interface RawMemoryRow {
   created_at: string;
 }
 
-function toMemoryEntry(row: RawMemoryRow): MemoryEntry {
-  let metadata: Record<string, unknown>;
+function parseJsonSafe(raw: string): Record<string, unknown> {
   try {
-    metadata = JSON.parse(row.metadata);
+    return JSON.parse(raw);
   } catch {
-    metadata = {};
+    return {};
   }
+}
+
+function toMemoryEntry(row: RawMemoryRow): MemoryEntry {
   return {
     id: row.id,
     type: row.type as MemoryType,
     content: row.content,
-    metadata,
+    metadata: parseJsonSafe(row.metadata),
     createdAt: row.created_at,
   };
 }

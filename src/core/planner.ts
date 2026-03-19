@@ -52,9 +52,7 @@ export class Planner {
     return this.getById(Number(result.lastInsertRowid))!;
   }
 
-  /**
-   * Atomically dequeue the next pending task (SELECT + UPDATE in one transaction).
-   */
+  /** Atomically dequeue the next pending task. */
   dequeueNext(): Task | null {
     const dequeue = this.db.transaction(() => {
       const row = this.db
@@ -143,9 +141,7 @@ export class Planner {
     return row.count > 0;
   }
 
-  /**
-   * Recover tasks stuck in "running" state (e.g. after a crash).
-   */
+  /** Reset tasks stuck in "running" state (e.g. after a crash) to "failed". */
   recoverOrphaned(): number {
     const result = this.db
       .prepare(

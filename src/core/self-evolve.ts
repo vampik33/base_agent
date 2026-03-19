@@ -5,7 +5,6 @@ import type { Config } from "../config.js";
 import type { ModelProfileRegistry } from "../models/profiles.js";
 import { buildModelEnv } from "../util.js";
 
-/** Files the self-evolving agent is NOT allowed to modify. */
 const PROTECTED_FILES = new Set([
   "src/core/self-evolve.ts",
   "src/config.ts",
@@ -14,21 +13,13 @@ const PROTECTED_FILES = new Set([
   ".gitignore",
 ]);
 
-/** Paths the self-evolving agent IS allowed to modify. */
 const ALLOWED_PATH_PREFIXES = ["src/", "skills/", "CLAUDE.md"];
 
 const MAX_CONSECUTIVE_FAILURES = 3;
 const SELF_EVOLVE_TOOLS = ["Read", "Write", "Edit", "Bash", "Glob", "Grep"];
 
-/**
- * Thrown inside evolve() to trigger abort-and-log without duplicating
- * the cleanup sequence at every failure site.
- */
 class EvolutionFailure extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "EvolutionFailure";
-  }
+  override name = "EvolutionFailure";
 }
 
 export class SelfEvolver {
@@ -57,9 +48,7 @@ export class SelfEvolver {
     }
   }
 
-  /**
-   * Attempt self-evolution. Returns true if evolution succeeded and process should restart.
-   */
+  /** Returns true if evolution succeeded and the process should restart. */
   async evolve(objective?: string): Promise<boolean> {
     if (!this.config.selfEvolveEnabled) {
       console.log("[self-evolve] Self-evolution is disabled.");
@@ -116,14 +105,8 @@ export class SelfEvolver {
     try {
       diff = await this.attemptEvolution(cwd, description);
     } catch (err) {
-      let errorMessage: string;
-      if (err instanceof EvolutionFailure) {
-        errorMessage = err.message;
-      } else if (err instanceof Error) {
-        errorMessage = err.message;
-        console.error("[self-evolve] Unexpected error:", errorMessage);
-      } else {
-        errorMessage = String(err);
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      if (!(err instanceof EvolutionFailure)) {
         console.error("[self-evolve] Unexpected error:", errorMessage);
       }
 
@@ -161,11 +144,7 @@ export class SelfEvolver {
     return true;
   }
 
-  /**
-   * Run the agent, validate changes, and run quality gates.
-   * Throws EvolutionFailure on any validation failure.
-   * Returns the diff on success.
-   */
+  /** Run the agent, validate changes, and run quality gates. Throws on failure. */
   private async attemptEvolution(cwd: string, description: string): Promise<string> {
     const profile = this.models.getDefault();
     const systemPrompt = this.buildSystemPrompt();
@@ -187,7 +166,6 @@ export class SelfEvolver {
       // Consume the stream -- we check git diff for actual changes
     }
 
-    // Check if any changes were made
     const diff = execSync("git diff", { cwd, encoding: "utf-8" }).trim();
     const untrackedOutput = execSync("git ls-files --others --exclude-standard", { cwd, encoding: "utf-8" }).trim();
 
@@ -196,7 +174,6 @@ export class SelfEvolver {
       throw new EvolutionFailure("No changes were made");
     }
 
-    // Validate that only allowed files were modified
     const changedFiles = splitNonEmpty(
       execSync("git diff --name-only", { cwd, encoding: "utf-8" })
     );
@@ -224,10 +201,6 @@ export class SelfEvolver {
     return diff;
   }
 
-  /**
-   * Run a shell command as a quality gate. Throws EvolutionFailure with
-   * stderr output on failure.
-   */
   private runGate(cwd: string, command: string, label: string): void {
     try {
       execSync(command, { cwd, encoding: "utf-8", stdio: "pipe" });
@@ -336,10 +309,9 @@ export class SelfEvolver {
   }
 }
 
-/** Extract stderr from an execSync error, falling back to string representation. */
 function extractStderr(err: unknown): string {
-  if (err instanceof Error && "stderr" in err) {
-    return String((err as { stderr: unknown }).stderr);
+  if (err && typeof err === "object" && "stderr" in err) {
+    return String(err.stderr);
   }
   return String(err);
 }

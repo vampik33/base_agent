@@ -58,9 +58,6 @@ async function main(): Promise<void> {
       models,
     };
 
-    // ── Self-evolution ──────────────────────────────────
-    const evolver = new SelfEvolver(db, config, models);
-
     // ── Scheduler ───────────────────────────────────────
     const scheduler = new AgentScheduler(config.cronExpression, ctx);
 
@@ -92,8 +89,8 @@ async function main(): Promise<void> {
 
     // ── Self-evolution (after initial tick) ──────────────
     if (config.selfEvolveEnabled) {
-      const shouldRestart = await evolver.evolve();
-      if (shouldRestart) {
+      const evolver = new SelfEvolver(db, config, models);
+      if (await evolver.evolve()) {
         db.close();
         process.exit(100); // Signal run.sh to rebuild and restart
       }

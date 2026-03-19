@@ -5,9 +5,7 @@ import type { MemoryStore } from "./memory/store.js";
 import type { SkillRegistry } from "./skills/registry.js";
 import type { ModelProfileRegistry } from "./models/profiles.js";
 
-// ============================================================================
 // Task
-// ============================================================================
 
 export type TaskStatus = "pending" | "running" | "completed" | "failed" | "cancelled";
 export type TaskSource = "user" | "auto" | "schedule";
@@ -35,9 +33,7 @@ export interface CreateTaskInput {
   source?: TaskSource;
 }
 
-// ============================================================================
 // Execution
-// ============================================================================
 
 export interface ExecutionResult {
   summary: string;
@@ -48,9 +44,7 @@ export interface ExecutionResult {
   abortReason?: "timeout" | "shutdown";
 }
 
-// ============================================================================
 // Model Profile
-// ============================================================================
 
 export interface ModelProfile {
   name: string;
@@ -59,9 +53,7 @@ export interface ModelProfile {
   apiKey: string;
 }
 
-// ============================================================================
 // Skill Definition
-// ============================================================================
 
 export interface SkillDefinition {
   name: string;
@@ -72,9 +64,7 @@ export interface SkillDefinition {
   mcpServers: Record<string, unknown>;
 }
 
-// ============================================================================
 // Memory
-// ============================================================================
 
 export type MemoryType = "conversation" | "task_result" | "user_preference" | "fact";
 
@@ -92,9 +82,7 @@ export interface CreateMemoryInput {
   metadata?: Record<string, unknown>;
 }
 
-// ============================================================================
 // Schedule
-// ============================================================================
 
 export interface Schedule {
   id: number;
@@ -118,9 +106,7 @@ export interface CreateScheduleInput {
   priority?: number;
 }
 
-// ============================================================================
 // Evolution
-// ============================================================================
 
 export interface EvolutionAttempt {
   id: number;
@@ -132,9 +118,7 @@ export interface EvolutionAttempt {
   createdAt: string;
 }
 
-// ============================================================================
 // Agent Context (DI container)
-// ============================================================================
 
 export interface AgentContext {
   db: Database.Database;

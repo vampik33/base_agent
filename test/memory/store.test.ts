@@ -22,10 +22,12 @@ describe("MemoryStore", () => {
       metadata: { source: "observation" },
     });
 
+    expect(entry).toMatchObject({
+      type: "fact",
+      content: "The sky is blue",
+      metadata: { source: "observation" },
+    });
     expect(entry.id).toBeGreaterThan(0);
-    expect(entry.type).toBe("fact");
-    expect(entry.content).toBe("The sky is blue");
-    expect(entry.metadata.source).toBe("observation");
 
     const retrieved = store.getById(entry.id);
     expect(retrieved).toBeDefined();
@@ -43,7 +45,9 @@ describe("MemoryStore", () => {
 
     const facts = store.getByType("fact");
     expect(facts).toHaveLength(2);
-    expect(facts.every((m) => m.type === "fact")).toBe(true);
+    for (const fact of facts) {
+      expect(fact.type).toBe("fact");
+    }
   });
 
   it("returns recent entries in descending order", () => {
@@ -52,9 +56,7 @@ describe("MemoryStore", () => {
     store.store({ type: "fact", content: "Third" });
 
     const recent = store.getRecent(2);
-    expect(recent).toHaveLength(2);
-    expect(recent[0]!.content).toBe("Third");
-    expect(recent[1]!.content).toBe("Second");
+    expect(recent.map((m) => m.content)).toEqual(["Third", "Second"]);
   });
 
   it("searches with FTS5", () => {
@@ -64,7 +66,9 @@ describe("MemoryStore", () => {
 
     const results = store.search("programming language");
     expect(results.length).toBeGreaterThanOrEqual(2);
-    expect(results.every((m) => m.content.includes("programming"))).toBe(true);
+    for (const result of results) {
+      expect(result.content).toContain("programming");
+    }
   });
 
   it("deletes by id", () => {

@@ -32,14 +32,13 @@ const MIGRATIONS: Record<number, string[]> = {
     )`,
     `CREATE INDEX IF NOT EXISTS idx_memories_type ON memories(type)`,
 
-    // FTS5 virtual table for full-text search on memories
     `CREATE VIRTUAL TABLE IF NOT EXISTS memories_fts USING fts5(
       content,
       content_rowid='id',
       content='memories'
     )`,
 
-    // Triggers to keep FTS in sync
+    // FTS sync triggers
     `CREATE TRIGGER IF NOT EXISTS memories_ai AFTER INSERT ON memories BEGIN
       INSERT INTO memories_fts(rowid, content) VALUES (new.id, new.content);
     END`,
@@ -64,7 +63,6 @@ const MIGRATIONS: Record<number, string[]> = {
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     )`,
 
-    // Evolution log for self-modification tracking
     `CREATE TABLE IF NOT EXISTS evolution_log (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       description TEXT NOT NULL,

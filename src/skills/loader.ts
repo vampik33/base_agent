@@ -2,10 +2,6 @@ import { readFileSync, readdirSync } from "node:fs";
 import { join, basename } from "node:path";
 import type { SkillDefinition } from "../types.js";
 
-/**
- * Parses Markdown skill files from a directory.
- * Expected sections: # (title), ## Description, ## System Prompt, ## Tools, ## Model, ## MCP Servers
- */
 export function loadSkills(skillsDir: string): Map<string, SkillDefinition> {
   const skills = new Map<string, SkillDefinition>();
 
@@ -51,15 +47,15 @@ function parseSections(content: string): Map<string, string> {
   let currentSection = "";
 
   for (const line of content.split("\n")) {
-    const h1Match = line.match(/^#\s+(.+)/);
+    const h1Match = /^#\s+(.+)/.exec(line);
     if (h1Match) {
-      sections.set("_title", h1Match[1]!.trim());
+      sections.set("_title", h1Match[1].trim());
       continue;
     }
 
-    const h2Match = line.match(/^##\s+(.+)/);
+    const h2Match = /^##\s+(.+)/.exec(line);
     if (h2Match) {
-      currentSection = h2Match[1]!.trim().toLowerCase();
+      currentSection = h2Match[1].trim().toLowerCase();
       continue;
     }
 

@@ -51,12 +51,14 @@ claude-sonnet-4-20250514
 
     const skill = skills.get("my skill");
     expect(skill).toBeDefined();
-    expect(skill!.name).toBe("My Skill");
+    expect(skill!).toMatchObject({
+      name: "My Skill",
+      tools: ["Read", "Write", "Bash"],
+      model: "claude-sonnet-4-20250514",
+      mcpServers: {},
+    });
     expect(skill!.description).toContain("A test skill");
     expect(skill!.systemPrompt).toContain("test agent");
-    expect(skill!.tools).toEqual(["Read", "Write", "Bash"]);
-    expect(skill!.model).toBe("claude-sonnet-4-20250514");
-    expect(skill!.mcpServers).toEqual({});
   });
 
   it("uses filename as fallback name when no H1", () => {
