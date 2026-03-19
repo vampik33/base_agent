@@ -71,6 +71,29 @@ describe("MemoryStore", () => {
     }
   });
 
+  it("returns empty array for blank search query", () => {
+    store.store({ type: "fact", content: "Some content" });
+    expect(store.search("")).toEqual([]);
+    expect(store.search("   ")).toEqual([]);
+  });
+
+  it("handles FTS5 special characters without throwing", () => {
+    store.store({ type: "fact", content: "testing func() and other stuff" });
+
+    // These would throw with raw FTS5 MATCH if not sanitized
+    expect(() => store.search('hello "unterminated')).not.toThrow();
+    expect(() => store.search("func(")).not.toThrow();
+    expect(() => store.search("a AND OR NOT")).not.toThrow();
+    expect(() => store.search("test*")).not.toThrow();
+    expect(() => store.search("(unbalanced")).not.toThrow();
+  });
+
+  it("finds content containing double quotes", () => {
+    store.store({ type: "fact", content: 'He said "hello world" to everyone' });
+    const results = store.search("hello world");
+    expect(results.length).toBeGreaterThanOrEqual(1);
+  });
+
   it("deletes by id", () => {
     const entry = store.store({ type: "fact", content: "To be deleted" });
     expect(store.deleteById(entry.id)).toBe(true);

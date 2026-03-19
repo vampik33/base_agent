@@ -17,7 +17,10 @@ const configSchema = z.object({
   workDir: z.string().default("."),
 
   // Self-evolution
-  selfEvolveEnabled: z.coerce.boolean().default(false),
+  selfEvolveEnabled: z
+    .string()
+    .default("false")
+    .transform((v) => v.toLowerCase() === "true" || v === "1"),
   defaultBranch: z.string().min(1).default("main"),
   selfEvolveBranch: z.string().default("evolve"),
 

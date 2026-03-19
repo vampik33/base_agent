@@ -127,9 +127,9 @@ export class Planner {
     return row.count;
   }
 
-  hasPendingTask(source: string, title: string): boolean {
+  hasActiveTask(source: string, title: string): boolean {
     const row = this.db
-      .prepare("SELECT COUNT(*) as count FROM tasks WHERE status = 'pending' AND source = ? AND title = ?")
+      .prepare("SELECT COUNT(*) as count FROM tasks WHERE status IN ('pending', 'running') AND source = ? AND title = ?")
       .get(source, title) as { count: number };
     return row.count > 0;
   }

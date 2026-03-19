@@ -18,6 +18,7 @@ export class AgentScheduler {
   private cron: Cron | null = null;
   private running = false;
   private abortController: AbortController | null = null;
+  private tickPromise: Promise<void> = Promise.resolve();
 
   constructor(
     private cronExpression: string,
@@ -26,14 +27,14 @@ export class AgentScheduler {
 
   start(): void {
     this.cron = new Cron(this.cronExpression, () => {
-      this.onTick().catch((err) => {
+      this.tickPromise = this.onTick().catch((err) => {
         console.error("[scheduler] Tick error:", err);
       });
     });
     console.log(`[scheduler] Started with cron: ${this.cronExpression}`);
   }
 
-  stop(): void {
+  async stop(): Promise<void> {
     if (this.cron) {
       this.cron.stop();
       this.cron = null;
@@ -41,6 +42,7 @@ export class AgentScheduler {
     if (this.abortController) {
       this.abortController.abort("shutdown");
     }
+    await this.tickPromise;
     console.log("[scheduler] Stopped.");
   }
 
@@ -110,7 +112,7 @@ export class AgentScheduler {
 
         if (!nextRun || nextRun > new Date()) continue;
 
-        if (this.ctx.planner.hasPendingTask("schedule", schedule.task_title)) continue;
+        if (this.ctx.planner.hasActiveTask("schedule", schedule.task_title)) continue;
 
         this.ctx.planner.addTask({
           title: schedule.task_title,

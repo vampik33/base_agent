@@ -60,6 +60,13 @@ export class MemoryStore {
   }
 
   search(query: string, limit = 20): MemoryEntry[] {
+    const trimmed = query.trim();
+    if (!trimmed) return [];
+
+    // Wrap in double-quotes to treat as a phrase, escaping internal quotes.
+    // This prevents FTS5 syntax errors from special characters in user input.
+    const safeQuery = '"' + trimmed.replace(/"/g, '""') + '"';
+
     const rows = this.db
       .prepare(`
         SELECT m.* FROM memories m
@@ -68,7 +75,7 @@ export class MemoryStore {
         ORDER BY bm25(memories_fts)
         LIMIT ?
       `)
-      .all(query, limit) as RawMemoryRow[];
+      .all(safeQuery, limit) as RawMemoryRow[];
     return rows.map(toMemoryEntry);
   }
 

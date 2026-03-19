@@ -86,8 +86,14 @@ describe("Planner", () => {
 
   it("detects duplicate pending tasks", () => {
     planner.addTask({ title: "Scheduled task", description: "d", source: "schedule" });
-    expect(planner.hasPendingTask("schedule", "Scheduled task")).toBe(true);
-    expect(planner.hasPendingTask("schedule", "Other task")).toBe(false);
+    expect(planner.hasActiveTask("schedule", "Scheduled task")).toBe(true);
+    expect(planner.hasActiveTask("schedule", "Other task")).toBe(false);
+  });
+
+  it("detects duplicate running tasks", () => {
+    planner.addTask({ title: "Scheduled task", description: "d", source: "schedule" });
+    planner.dequeueNext(); // status becomes "running"
+    expect(planner.hasActiveTask("schedule", "Scheduled task")).toBe(true);
   });
 
   it("recovers orphaned running tasks", () => {

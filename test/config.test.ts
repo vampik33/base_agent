@@ -65,11 +65,32 @@ describe("loadConfig", () => {
     expect(config.workDir).toMatch(/^\//);
   });
 
-  it("parses boolean env vars", () => {
+  it("parses SELF_EVOLVE_ENABLED='true' as true", () => {
     process.env.API_KEY = "sk-test";
     process.env.SELF_EVOLVE_ENABLED = "true";
     const config = loadConfig();
     expect(config.selfEvolveEnabled).toBe(true);
+  });
+
+  it("parses SELF_EVOLVE_ENABLED='1' as true", () => {
+    process.env.API_KEY = "sk-test";
+    process.env.SELF_EVOLVE_ENABLED = "1";
+    const config = loadConfig();
+    expect(config.selfEvolveEnabled).toBe(true);
+  });
+
+  it("parses SELF_EVOLVE_ENABLED='false' as false", () => {
+    process.env.API_KEY = "sk-test";
+    process.env.SELF_EVOLVE_ENABLED = "false";
+    const config = loadConfig();
+    expect(config.selfEvolveEnabled).toBe(false);
+  });
+
+  it("parses SELF_EVOLVE_ENABLED='0' as false", () => {
+    process.env.API_KEY = "sk-test";
+    process.env.SELF_EVOLVE_ENABLED = "0";
+    const config = loadConfig();
+    expect(config.selfEvolveEnabled).toBe(false);
   });
 
   it("uses custom API_BASE_URL", () => {

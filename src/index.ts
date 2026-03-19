@@ -65,12 +65,12 @@ async function main(): Promise<void> {
 
     // ── Graceful shutdown ───────────────────────────────
     let shuttingDown = false;
-    function shutdown(signal: string): void {
+    async function shutdown(signal: string): Promise<void> {
       if (shuttingDown) return;
       shuttingDown = true;
       console.log(`\n[agent] Received ${signal}, shutting down...`);
 
-      scheduler.stop();
+      await scheduler.stop();
 
       const orphaned = planner.recoverOrphaned();
       if (orphaned > 0) {
@@ -82,8 +82,8 @@ async function main(): Promise<void> {
       process.exit(0);
     }
 
-    process.on("SIGTERM", () => shutdown("SIGTERM"));
-    process.on("SIGINT", () => shutdown("SIGINT"));
+    process.on("SIGTERM", () => { shutdown("SIGTERM").catch(console.error); });
+    process.on("SIGINT", () => { shutdown("SIGINT").catch(console.error); });
 
     // ── Initial tick ────────────────────────────────────
     console.log("[agent] Running initial tick...");
