@@ -6,7 +6,6 @@ import { MemoryStore } from "./memory/store.js";
 import { ModelProfileRegistry } from "./models/profiles.js";
 import { loadSkills } from "./skills/loader.js";
 import { SkillRegistry } from "./skills/registry.js";
-import { McpManager } from "./mcp/manager.js";
 import { Planner } from "./core/planner.js";
 import { AgentScheduler } from "./core/scheduler.js";
 import { SelfEvolver } from "./core/self-evolve.js";
@@ -35,8 +34,6 @@ async function main(): Promise<void> {
     const memory = new MemoryStore(db);
     const models = new ModelProfileRegistry(config);
     const planner = new Planner(db);
-    const mcp = new McpManager();
-
     const orphaned = planner.recoverOrphaned();
     if (orphaned > 0) {
       console.log(`[agent] Recovered ${orphaned} orphaned task(s) from previous crash.`);
@@ -51,11 +48,6 @@ async function main(): Promise<void> {
       db,
     });
 
-    // Register external MCP servers from skills
-    for (const skill of loadedSkills.values()) {
-      mcp.registerFromSkill(skill);
-    }
-
     // ── Agent context (DI container) ────────────────────
     const ctx: AgentContext = {
       db,
@@ -64,7 +56,6 @@ async function main(): Promise<void> {
       memory,
       skills,
       models,
-      mcp,
     };
 
     // ── Self-evolution ──────────────────────────────────

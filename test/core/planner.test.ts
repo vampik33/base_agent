@@ -1,27 +1,18 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { unlinkSync } from "node:fs";
-import { join } from "node:path";
-import { tmpdir } from "node:os";
-import { initDatabase } from "../../src/memory/db.js";
 import { Planner } from "../../src/core/planner.js";
-import type Database from "better-sqlite3";
+import { openTestDatabase, closeTestDatabase, type TestDatabase } from "../helpers/db.js";
 
 describe("Planner", () => {
-  let db: Database.Database;
+  let testDb: TestDatabase;
   let planner: Planner;
-  let dbPath: string;
 
   beforeEach(() => {
-    dbPath = join(tmpdir(), `test-planner-${Date.now()}.db`);
-    db = initDatabase(dbPath);
-    planner = new Planner(db);
+    testDb = openTestDatabase("test-planner");
+    planner = new Planner(testDb.db);
   });
 
   afterEach(() => {
-    db.close();
-    try { unlinkSync(dbPath); } catch { /* ok */ }
-    try { unlinkSync(dbPath + "-wal"); } catch { /* ok */ }
-    try { unlinkSync(dbPath + "-shm"); } catch { /* ok */ }
+    closeTestDatabase(testDb);
   });
 
   it("adds a task and retrieves it by id", () => {

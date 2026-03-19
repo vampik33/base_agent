@@ -1,5 +1,5 @@
 import { Cron } from "croner";
-import type { AgentContext } from "../types.js";
+import type { AgentContext, Task } from "../types.js";
 import { executeTask } from "./executor.js";
 import { formatDuration } from "../util.js";
 
@@ -97,7 +97,7 @@ export class AgentScheduler {
     }
   }
 
-  private dequeueNextWithinBudget() {
+  private dequeueNextWithinBudget(): Task | null {
     const spentToday = this.ctx.planner.todaysCost();
     const remainingBudget = this.ctx.config.dailyBudgetUsd - spentToday;
 

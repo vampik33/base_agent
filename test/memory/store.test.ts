@@ -1,27 +1,18 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { unlinkSync } from "node:fs";
-import { join } from "node:path";
-import { tmpdir } from "node:os";
-import { initDatabase } from "../../src/memory/db.js";
 import { MemoryStore } from "../../src/memory/store.js";
-import type Database from "better-sqlite3";
+import { openTestDatabase, closeTestDatabase, type TestDatabase } from "../helpers/db.js";
 
 describe("MemoryStore", () => {
-  let db: Database.Database;
+  let testDb: TestDatabase;
   let store: MemoryStore;
-  let dbPath: string;
 
   beforeEach(() => {
-    dbPath = join(tmpdir(), `test-agent-${Date.now()}.db`);
-    db = initDatabase(dbPath);
-    store = new MemoryStore(db);
+    testDb = openTestDatabase("test-agent");
+    store = new MemoryStore(testDb.db);
   });
 
   afterEach(() => {
-    db.close();
-    try { unlinkSync(dbPath); } catch { /* ok */ }
-    try { unlinkSync(dbPath + "-wal"); } catch { /* ok */ }
-    try { unlinkSync(dbPath + "-shm"); } catch { /* ok */ }
+    closeTestDatabase(testDb);
   });
 
   it("stores and retrieves a memory entry", () => {

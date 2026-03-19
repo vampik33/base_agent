@@ -1,32 +1,38 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { loadConfig } from "../src/config.js";
 
+const CONFIG_ENV_VARS = [
+  "API_KEY",
+  "API_BASE_URL",
+  "DEFAULT_MODEL",
+  "CRON_EXPRESSION",
+  "DAILY_BUDGET_USD",
+  "MAX_BUDGET_PER_TASK_USD",
+  "WORK_DIR",
+  "SELF_EVOLVE_ENABLED",
+  "DEFAULT_BRANCH",
+  "SELF_EVOLVE_BRANCH",
+  "DEFAULT_SYSTEM_PROMPT",
+] as const;
+
 describe("loadConfig", () => {
-  const originalEnv = { ...process.env };
+  const savedEnv: Record<string, string | undefined> = {};
 
   beforeEach(() => {
-    // Clear relevant env vars
-    delete process.env.API_KEY;
-    delete process.env.API_BASE_URL;
-    delete process.env.DEFAULT_MODEL;
-    delete process.env.CRON_EXPRESSION;
-    delete process.env.DAILY_BUDGET_USD;
-    delete process.env.MAX_BUDGET_PER_TASK_USD;
-    delete process.env.WORK_DIR;
-    delete process.env.SELF_EVOLVE_ENABLED;
-    delete process.env.DEFAULT_BRANCH;
-    delete process.env.SELF_EVOLVE_BRANCH;
-    delete process.env.DEFAULT_SYSTEM_PROMPT;
+    for (const key of CONFIG_ENV_VARS) {
+      savedEnv[key] = process.env[key];
+      delete process.env[key];
+    }
   });
 
   afterEach(() => {
-    // Restore env
-    for (const key of Object.keys(process.env)) {
-      if (!(key in originalEnv)) {
+    for (const key of CONFIG_ENV_VARS) {
+      if (savedEnv[key] === undefined) {
         delete process.env[key];
+      } else {
+        process.env[key] = savedEnv[key];
       }
     }
-    Object.assign(process.env, originalEnv);
   });
 
   it("throws when API_KEY is not set", () => {

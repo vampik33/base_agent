@@ -29,9 +29,8 @@ npm test           # Run tests (vitest)
 - **src/types.ts** — Shared TypeScript interfaces
 - **src/util.ts** — Helper functions (cleanEnv, buildModelEnv, sleep)
 - **src/memory/** — SQLite persistence (db.ts: schema/migrations, store.ts: CRUD + FTS5)
-- **src/skills/** — Markdown skill parser (loader.ts) and MCP tool registry (registry.ts)
+- **src/skills/** — Markdown skill parser (loader.ts) and MCP tool registry (registry.ts: merges skill MCP configs)
 - **src/models/** — Multi-model provider profiles (profiles.ts: ModelProfileRegistry with env auto-discovery)
-- **src/mcp/** — External MCP server management (manager.ts: collects configs from skills)
 - **src/core/planner.ts** — SQLite-backed priority task queue
 - **src/core/executor.ts** — Task execution via Agent SDK query()
 - **src/core/scheduler.ts** — Cron-based scheduler (croner)

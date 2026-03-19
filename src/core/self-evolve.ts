@@ -20,6 +20,17 @@ const ALLOWED_PATH_PREFIXES = ["src/", "skills/", "CLAUDE.md"];
 const MAX_CONSECUTIVE_FAILURES = 3;
 const SELF_EVOLVE_TOOLS = ["Read", "Write", "Edit", "Bash", "Glob", "Grep"];
 
+/**
+ * Thrown inside evolve() to trigger abort-and-log without duplicating
+ * the cleanup sequence at every failure site.
+ */
+class EvolutionFailure extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "EvolutionFailure";
+  }
+}
+
 export class SelfEvolver {
   private consecutiveFailures = 0;
 
@@ -28,7 +39,6 @@ export class SelfEvolver {
     private config: Config,
     private models: ModelProfileRegistry
   ) {
-    // Load consecutive failure count from recent evolution log
     const recentFailures = this.db
       .prepare(`
         SELECT status FROM evolution_log
@@ -102,118 +112,131 @@ export class SelfEvolver {
 
     const description = objective ?? "Analyze recent task results and identify improvements to make";
     let diff = "";
-    let commitHash: string | null = null;
-    let errorOutput: string | null = null;
 
     try {
-      // Run Agent SDK with self-evolve prompt
-      const profile = this.models.getDefault();
-      const systemPrompt = this.buildSystemPrompt();
-      const prompt = this.buildPrompt(description);
-
-      for await (const _message of query({
-        prompt,
-        options: {
-          model: profile.model,
-          env: buildModelEnv(profile),
-          systemPrompt,
-          allowedTools: SELF_EVOLVE_TOOLS,
-          maxTurns: 30,
-          permissionMode: "bypassPermissions",
-          allowDangerouslySkipPermissions: true,
-          cwd,
-        },
-      })) {
-        // Consume the stream — we check git diff for actual changes
-      }
-
-      // Check if any changes were made
-      diff = execSync("git diff", { cwd, encoding: "utf-8" }).trim();
-      const untrackedOutput = execSync("git ls-files --others --exclude-standard", { cwd, encoding: "utf-8" }).trim();
-
-      if (!diff && !untrackedOutput) {
-        console.log("[self-evolve] No changes made. Aborting.");
-        this.abortEvolution(cwd, baseBranch, originalBranch, branch);
-        this.logAttempt(description, "", null, "failed", "No changes were made");
-        this.consecutiveFailures++;
-        return false;
-      }
-
-      // Validate that only allowed files were modified
-      const changedFiles = execSync("git diff --name-only", { cwd, encoding: "utf-8" })
-        .trim()
-        .split("\n")
-        .filter((f) => f.length > 0);
-      const untrackedFiles = untrackedOutput ? untrackedOutput.split("\n").filter((f) => f.length > 0) : [];
-      const allChanged = [...changedFiles, ...untrackedFiles];
-
-      for (const file of allChanged) {
-        if (PROTECTED_FILES.has(file)) {
-          console.log(`[self-evolve] Protected file modified: ${file}. Aborting.`);
-          this.abortEvolution(cwd, baseBranch, originalBranch, branch);
-          this.logAttempt(description, diff, null, "failed", `Protected file modified: ${file}`);
-          this.consecutiveFailures++;
-          return false;
-        }
-
-        if (!ALLOWED_PATH_PREFIXES.some((prefix) => file.startsWith(prefix))) {
-          console.log(`[self-evolve] File outside allowed paths: ${file}. Aborting.`);
-          this.abortEvolution(cwd, baseBranch, originalBranch, branch);
-          this.logAttempt(description, diff, null, "failed", `File outside allowed paths: ${file}`);
-          this.consecutiveFailures++;
-          return false;
-        }
-      }
-
-      // Gate 1: Typecheck
-      try {
-        execSync("npx tsc --noEmit", { cwd, encoding: "utf-8", stdio: "pipe" });
-        console.log("[self-evolve] Typecheck passed.");
-      } catch (err) {
-        const stderr = err instanceof Error && "stderr" in err ? String((err as { stderr: unknown }).stderr) : String(err);
-        console.log("[self-evolve] Typecheck failed. Aborting.");
-        this.abortEvolution(cwd, baseBranch, originalBranch, branch);
-        this.logAttempt(description, diff, null, "failed", `Typecheck failed:\n${stderr.slice(0, 2000)}`);
-        this.consecutiveFailures++;
-        return false;
-      }
-
-      // Gate 2: Tests (if they exist)
-      try {
-        execSync("npm test", { cwd, encoding: "utf-8", stdio: "pipe" });
-        console.log("[self-evolve] Tests passed.");
-      } catch (err) {
-        const stderr = err instanceof Error && "stderr" in err ? String((err as { stderr: unknown }).stderr) : String(err);
-        console.log("[self-evolve] Tests failed. Aborting.");
-        this.abortEvolution(cwd, baseBranch, originalBranch, branch);
-        this.logAttempt(description, diff, null, "failed", `Tests failed:\n${stderr.slice(0, 2000)}`);
-        this.consecutiveFailures++;
-        return false;
-      }
-
-      // All gates passed — commit and merge
-      execSync("git add -A", { cwd });
-      diff = execSync("git diff --cached", { cwd, encoding: "utf-8" }).trim();
-      execSync(`git commit -m "self-evolve: ${description.slice(0, 72)}"`, { cwd });
-      commitHash = execSync("git rev-parse HEAD", { cwd, encoding: "utf-8" }).trim();
-
-      // Merge back into configured base branch.
-      this.checkoutBranch(cwd, baseBranch);
-      execSync(`git merge --ff-only ${branch}`, { cwd, stdio: "pipe" });
-      execSync(`git branch -d ${branch}`, { cwd });
-
-      this.logAttempt(description, diff, commitHash, "success", null);
-      this.consecutiveFailures = 0;
-
-      console.log(`[self-evolve] Evolution successful (${commitHash!.slice(0, 8)}). Restarting...`);
-      return true;
+      diff = await this.attemptEvolution(cwd, description);
     } catch (err) {
-      errorOutput = err instanceof Error ? err.message : String(err);
-      console.error("[self-evolve] Unexpected error:", errorOutput);
+      let errorMessage: string;
+      if (err instanceof EvolutionFailure) {
+        errorMessage = err.message;
+      } else if (err instanceof Error) {
+        errorMessage = err.message;
+        console.error("[self-evolve] Unexpected error:", errorMessage);
+      } else {
+        errorMessage = String(err);
+        console.error("[self-evolve] Unexpected error:", errorMessage);
+      }
+
       this.abortEvolution(cwd, baseBranch, originalBranch, branch);
-      this.logAttempt(description, diff, null, "failed", errorOutput);
+      this.logAttempt(description, diff, null, "failed", errorMessage);
       this.consecutiveFailures++;
       return false;
+    }
+
+    let commitHash = "";
+
+    try {
+      // All gates passed -- commit and merge
+      execSync("git add -A", { cwd });
+      diff = execSync("git diff --cached", { cwd, encoding: "utf-8" }).trim();
+      execSync(`git commit -m "self-evolve: ${description.slice(0, 72)}"`, { cwd, stdio: "pipe" });
+      commitHash = execSync("git rev-parse HEAD", { cwd, encoding: "utf-8" }).trim();
+
+      this.checkoutBranch(cwd, baseBranch);
+      execSync(`git merge --ff-only ${branch}`, { cwd, stdio: "pipe" });
+      execSync(`git branch -d ${branch}`, { cwd, stdio: "pipe" });
+    } catch (err) {
+      const errorMessage = `Git finalize failed:\n${extractStderr(err).slice(0, 2000)}`;
+      console.error("[self-evolve]", errorMessage);
+      this.abortEvolution(cwd, baseBranch, originalBranch, branch);
+      this.logAttempt(description, diff, null, "failed", errorMessage);
+      this.consecutiveFailures++;
+      return false;
+    }
+
+    this.logAttempt(description, diff, commitHash, "success", null);
+    this.consecutiveFailures = 0;
+
+    console.log(`[self-evolve] Evolution successful (${commitHash.slice(0, 8)}). Restarting...`);
+    return true;
+  }
+
+  /**
+   * Run the agent, validate changes, and run quality gates.
+   * Throws EvolutionFailure on any validation failure.
+   * Returns the diff on success.
+   */
+  private async attemptEvolution(cwd: string, description: string): Promise<string> {
+    const profile = this.models.getDefault();
+    const systemPrompt = this.buildSystemPrompt();
+    const prompt = this.buildPrompt(description);
+
+    for await (const _message of query({
+      prompt,
+      options: {
+        model: profile.model,
+        env: buildModelEnv(profile),
+        systemPrompt,
+        allowedTools: SELF_EVOLVE_TOOLS,
+        maxTurns: 30,
+        permissionMode: "bypassPermissions",
+        allowDangerouslySkipPermissions: true,
+        cwd,
+      },
+    })) {
+      // Consume the stream -- we check git diff for actual changes
+    }
+
+    // Check if any changes were made
+    const diff = execSync("git diff", { cwd, encoding: "utf-8" }).trim();
+    const untrackedOutput = execSync("git ls-files --others --exclude-standard", { cwd, encoding: "utf-8" }).trim();
+
+    if (!diff && !untrackedOutput) {
+      console.log("[self-evolve] No changes made. Aborting.");
+      throw new EvolutionFailure("No changes were made");
+    }
+
+    // Validate that only allowed files were modified
+    const changedFiles = splitNonEmpty(
+      execSync("git diff --name-only", { cwd, encoding: "utf-8" })
+    );
+    const untrackedFiles = splitNonEmpty(untrackedOutput);
+    const allChanged = [...changedFiles, ...untrackedFiles];
+
+    for (const file of allChanged) {
+      if (PROTECTED_FILES.has(file)) {
+        console.log(`[self-evolve] Protected file modified: ${file}. Aborting.`);
+        throw new EvolutionFailure(`Protected file modified: ${file}`);
+      }
+
+      if (!ALLOWED_PATH_PREFIXES.some((prefix) => file.startsWith(prefix))) {
+        console.log(`[self-evolve] File outside allowed paths: ${file}. Aborting.`);
+        throw new EvolutionFailure(`File outside allowed paths: ${file}`);
+      }
+    }
+
+    // Gate 1: Typecheck
+    this.runGate(cwd, "npx tsc --noEmit", "Typecheck");
+
+    // Gate 2: Tests
+    this.runGate(cwd, "npm test", "Tests");
+
+    return diff;
+  }
+
+  /**
+   * Run a shell command as a quality gate. Throws EvolutionFailure with
+   * stderr output on failure.
+   */
+  private runGate(cwd: string, command: string, label: string): void {
+    try {
+      execSync(command, { cwd, encoding: "utf-8", stdio: "pipe" });
+      console.log(`[self-evolve] ${label} passed.`);
+    } catch (err) {
+      console.log(`[self-evolve] ${label} failed. Aborting.`);
+      throw new EvolutionFailure(
+        `${label} failed:\n${extractStderr(err).slice(0, 2000)}`
+      );
     }
   }
 
@@ -271,7 +294,6 @@ export class SelfEvolver {
   }
 
   private buildPrompt(objective: string): string {
-    // Fetch recent task results for context
     const recentTasks = this.db
       .prepare(`
         SELECT title, result, status FROM tasks
@@ -312,4 +334,17 @@ export class SelfEvolver {
 
     return sections.join("\n\n");
   }
+}
+
+/** Extract stderr from an execSync error, falling back to string representation. */
+function extractStderr(err: unknown): string {
+  if (err instanceof Error && "stderr" in err) {
+    return String((err as { stderr: unknown }).stderr);
+  }
+  return String(err);
+}
+
+/** Split a string by newlines and filter out empty entries. */
+function splitNonEmpty(text: string): string[] {
+  return text.trim().split("\n").filter((line) => line.length > 0);
 }

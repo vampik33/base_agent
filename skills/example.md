@@ -2,7 +2,10 @@
 
 ## Description
 
-An example skill showing the markdown format. Skills are loaded from the `skills/` directory.
+Template showing the skill markdown format. Copy this file to create new skills.
+Each section is parsed by the skill loader: Description and System Prompt are free text,
+Tools is a bulleted list of allowed tool names, Model is a profile name or model ID
+(leave empty for default), and MCP Servers is a JSON object (leave empty for none).
 
 ## System Prompt
 

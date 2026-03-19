@@ -85,23 +85,27 @@ export class Planner {
   }
 
   completeTask(id: number, result: string, costUsd: number, sessionId: string): void {
-    this.db
-      .prepare(`
-        UPDATE tasks
-        SET result = ?, cost_usd = ?, session_id = ?, status = 'completed', updated_at = datetime('now')
-        WHERE id = ?
-      `)
-      .run(result, costUsd, sessionId, id);
+    this.resolveTask(id, "completed", result, costUsd, sessionId);
   }
 
   failTask(id: number, error: string, costUsd = 0, sessionId = ""): void {
+    this.resolveTask(id, "failed", error, costUsd, sessionId);
+  }
+
+  private resolveTask(
+    id: number,
+    status: "completed" | "failed",
+    result: string,
+    costUsd: number,
+    sessionId: string
+  ): void {
     this.db
       .prepare(`
         UPDATE tasks
-        SET result = ?, cost_usd = ?, session_id = ?, status = 'failed', updated_at = datetime('now')
+        SET result = ?, cost_usd = ?, session_id = ?, status = ?, updated_at = datetime('now')
         WHERE id = ?
       `)
-      .run(error, costUsd, sessionId, id);
+      .run(result, costUsd, sessionId, status, id);
   }
 
   listPending(limit = 20): Task[] {

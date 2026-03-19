@@ -4,7 +4,6 @@ import type { Planner } from "./core/planner.js";
 import type { MemoryStore } from "./memory/store.js";
 import type { SkillRegistry } from "./skills/registry.js";
 import type { ModelProfileRegistry } from "./models/profiles.js";
-import type { McpManager } from "./mcp/manager.js";
 
 // ============================================================================
 // Task
@@ -144,5 +143,4 @@ export interface AgentContext {
   memory: MemoryStore;
   skills: SkillRegistry;
   models: ModelProfileRegistry;
-  mcp: McpManager;
 }
