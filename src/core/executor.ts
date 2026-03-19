@@ -1,6 +1,7 @@
 import { query } from "@anthropic-ai/claude-agent-sdk";
 import type { Task, ExecutionResult, AgentContext } from "../types.js";
 import { buildModelEnv } from "../util.js";
+import { logMessage } from "./message-logger.js";
 
 const DEFAULT_TOOLS = ["Read", "Write", "Edit", "Bash", "Glob", "Grep", "WebFetch", "WebSearch"];
 
@@ -52,13 +53,7 @@ export async function executeTask(
         abortController: controller,
       },
     })) {
-      if (message.type === "assistant" && message.message?.content) {
-        for (const block of message.message.content) {
-          if ("text" in block && block.text) {
-            console.log(`[executor] Task #${task.id}: ${block.text.slice(0, 200)}`);
-          }
-        }
-      }
+      logMessage(`task#${task.id}`, message);
 
       if ("session_id" in message && message.session_id) {
         lastSessionId = message.session_id;

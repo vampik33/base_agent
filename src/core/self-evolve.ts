@@ -4,6 +4,7 @@ import type Database from "better-sqlite3";
 import type { Config } from "../config.js";
 import type { ModelProfileRegistry } from "../models/profiles.js";
 import { buildModelEnv } from "../util.js";
+import { logMessage } from "./message-logger.js";
 
 const PROTECTED_FILES = new Set([
   "src/core/self-evolve.ts",
@@ -154,7 +155,7 @@ export class SelfEvolver {
     const systemPrompt = this.buildSystemPrompt();
     const prompt = this.buildPrompt(description);
 
-    for await (const _message of query({
+    for await (const message of query({
       prompt,
       options: {
         model: profile.model,
@@ -167,7 +168,7 @@ export class SelfEvolver {
         cwd,
       },
     })) {
-      // Consume the stream -- we check git diff for actual changes
+      logMessage("self-evolve", message);
     }
 
     const diff = execSync("git diff", { cwd, encoding: "utf-8" }).trim();
